@@ -1,0 +1,12 @@
+[package]
+name = "stained"
+version = "0.1.0"
+authors = ["CJ Carey <perimosocordiae@gmail.com>"]
+edition = "2021"
+
+[lib]
+name = "stained"
+
+[dependencies]
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
