@@ -74,14 +74,14 @@ impl GameState {
                 .collect(),
         })
     }
-    fn curr_player(&self) -> &Player {
-        &self.players[self.curr_player_idx]
-    }
     fn is_finished(&self) -> bool {
         self.round_track.len() >= NUM_ROUNDS && self.draft_pool.is_empty()
     }
     fn next_idx(&self, idx: usize) -> usize {
         (idx + 1) % self.players.len()
+    }
+    fn prev_idx(&self, idx: usize) -> usize {
+        (idx + self.players.len() - 1) % self.players.len()
     }
     fn pool_size(&self) -> usize {
         2 * self.players.len() + 1
@@ -89,19 +89,42 @@ impl GameState {
     pub fn take_turn(&mut self, action: TurnAction) -> Result<bool, DynError> {
         match self.phase {
             TurnPhase::SelectTemplate => {
-                self.players[self.curr_player_idx].select_template(action.idx);
+                self.players[self.curr_player_idx].select_template(action.idx)?;
                 self.curr_player_idx = self.next_idx(self.curr_player_idx);
                 if self.curr_player_idx == self.start_player_idx {
                     self.start_round();
                 }
             }
-            // After all players draft once, the order is reversed and we
-            // transition to SecondDraft.
-            TurnPhase::FirstDraft => todo!("FirstDraft"),
-            // After all players draft a second time, the round is over.
-            // If this was the last round, the game is over.
-            // Otherwise, we start a new round.
-            TurnPhase::SecondDraft => todo!("SecondDraft"),
+            TurnPhase::FirstDraft => {
+                if action.coords.is_none() {
+                    return Err("Missing destination coordinates".into());
+                }
+                let coords = action.coords.unwrap();
+                let die = self.draft_pool.remove(action.idx);
+                self.players[self.curr_player_idx].place_die(coords, die)?;
+                self.curr_player_idx = self.next_idx(self.curr_player_idx);
+                if self.curr_player_idx == self.start_player_idx {
+                    self.curr_player_idx = self.prev_idx(self.curr_player_idx);
+                    self.phase = TurnPhase::SecondDraft;
+                }
+            }
+            TurnPhase::SecondDraft => {
+                if action.coords.is_none() {
+                    return Err("Missing destination coordinates".into());
+                }
+                let coords = action.coords.unwrap();
+                let die = self.draft_pool.remove(action.idx);
+                self.players[self.curr_player_idx].place_die(coords, die)?;
+                self.curr_player_idx = self.prev_idx(self.curr_player_idx);
+                if self.curr_player_idx == self.start_player_idx {
+                    self.finish_round();
+                    if self.is_finished() {
+                        self.phase = TurnPhase::GameOver;
+                    } else {
+                        self.start_round();
+                    }
+                }
+            }
             TurnPhase::GameOver => return Err("Game is over".into()),
         }
         Ok(matches!(self.phase, TurnPhase::GameOver))
@@ -120,6 +143,12 @@ impl GameState {
         self.round_track.push(self.draft_pool.pop().unwrap());
         self.start_player_idx = self.next_idx(self.start_player_idx);
     }
+    pub fn player_scores(&self) -> Vec<i32> {
+        self.players
+            .iter()
+            .map(|player| player.calculate_score(&self.objectives))
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,6 +163,7 @@ pub enum TurnPhase {
 pub struct TurnAction {
     idx: usize,
     coords: Option<(usize, usize)>,
+    // TODO: tool selection
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -144,7 +174,10 @@ pub struct Player {
     templates: Vec<BoardTemplate>,
 }
 impl Player {
-    fn select_template(&mut self, idx: usize) {
+    fn select_template(&mut self, idx: usize) -> Result<(), DynError> {
+        if !(0..self.templates.len()).contains(&idx) {
+            return Err("Invalid template index".into());
+        }
         let template = &self.templates[idx];
         self.tokens = template.value;
         for i in 0..BOARD_ROWS {
@@ -152,6 +185,28 @@ impl Player {
                 self.board[i][j].slot = template.slots[i][j];
             }
         }
+        Ok(())
+    }
+    fn place_die(&mut self, coords: (usize, usize), die: Dice) -> Result<(), DynError> {
+        if !(0..BOARD_ROWS).contains(&coords.0) || !(0..BOARD_COLS).contains(&coords.1) {
+            return Err("Invalid coordinates".into());
+        }
+        let cell = &mut self.board[coords.0][coords.1];
+        if cell.die.is_some() {
+            return Err("Cell is already occupied".into());
+        }
+        match cell.slot {
+            Slot::Color(color) if color != die.color => {
+                return Err("Die color does not match slot".into());
+            }
+            Slot::Face(face) if face != die.face => {
+                return Err("Die face does not match slot".into());
+            }
+            _ => {}
+        }
+        // TODO: check adjacency rules here
+        cell.die = Some(die);
+        Ok(())
     }
     fn calculate_score(&self, objectives: &[Objective]) -> i32 {
         // One point for each die matching our secret color, and minus one
