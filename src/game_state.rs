@@ -17,6 +17,7 @@ pub struct GameState {
     players: Vec<Player>,
     start_player_idx: usize,
     curr_player_idx: usize,
+    phase: TurnPhase,
     dice_bag: Vec<Color>,
     draft_pool: Vec<Dice>,
     round_track: Vec<Dice>,
@@ -62,6 +63,7 @@ impl GameState {
             players,
             start_player_idx,
             curr_player_idx: start_player_idx,
+            phase: TurnPhase::SelectTemplate,
             dice_bag,
             draft_pool: Vec::new(),
             round_track: Vec::new(),
@@ -72,26 +74,66 @@ impl GameState {
                 .collect(),
         })
     }
-    pub fn curr_player(&self) -> &Player {
+    fn curr_player(&self) -> &Player {
         &self.players[self.curr_player_idx]
     }
-    pub fn is_finished(&self) -> bool {
+    fn is_finished(&self) -> bool {
         self.round_track.len() >= NUM_ROUNDS && self.draft_pool.is_empty()
     }
+    fn next_idx(&self, idx: usize) -> usize {
+        (idx + 1) % self.players.len()
+    }
+    fn pool_size(&self) -> usize {
+        2 * self.players.len() + 1
+    }
+    pub fn take_turn(&mut self, action: TurnAction) -> Result<bool, DynError> {
+        match self.phase {
+            TurnPhase::SelectTemplate => {
+                self.players[self.curr_player_idx].select_template(action.idx);
+                self.curr_player_idx = self.next_idx(self.curr_player_idx);
+                if self.curr_player_idx == self.start_player_idx {
+                    self.start_round();
+                }
+            }
+            // After all players draft once, the order is reversed and we
+            // transition to SecondDraft.
+            TurnPhase::FirstDraft => todo!("FirstDraft"),
+            // After all players draft a second time, the round is over.
+            // If this was the last round, the game is over.
+            // Otherwise, we start a new round.
+            TurnPhase::SecondDraft => todo!("SecondDraft"),
+            TurnPhase::GameOver => return Err("Game is over".into()),
+        }
+        Ok(matches!(self.phase, TurnPhase::GameOver))
+    }
     fn start_round(&mut self) {
-        let num_dice: usize = 2 * self.players.len() + 1;
         self.draft_pool = self
             .dice_bag
-            .split_off(self.dice_bag.len() - num_dice)
+            .split_off(self.dice_bag.len() - self.pool_size())
             .into_iter()
             .map(roll_die)
             .collect();
+        self.phase = TurnPhase::FirstDraft;
     }
     fn finish_round(&mut self) {
         assert_eq!(self.draft_pool.len(), 1);
         self.round_track.push(self.draft_pool.pop().unwrap());
-        self.start_player_idx = (self.start_player_idx + 1) % self.players.len();
+        self.start_player_idx = self.next_idx(self.start_player_idx);
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TurnPhase {
+    SelectTemplate,
+    FirstDraft,
+    SecondDraft,
+    GameOver,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TurnAction {
+    idx: usize,
+    coords: Option<(usize, usize)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
