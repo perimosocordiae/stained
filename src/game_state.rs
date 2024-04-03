@@ -37,13 +37,14 @@ impl GameState {
 
         let start_player_idx = (0..num_players).choose(&mut rng).unwrap_or(0);
         let player_templates: Vec<_> = ALL_BOARD_TEMPLATES
-            .choose_multiple(&mut rng, num_players * 2).collect();
+            .choose_multiple(&mut rng, num_players * 2)
+            .collect();
         let players = ALL_COLORS
             .choose_multiple(&mut rng, num_players)
             .zip(player_templates.as_slice().chunks(2))
             .map(|(secret, templates)| Player {
                 tokens: 0,
-                board: [[BoardCell::Slot(Slot::Any); BOARD_COLS]; BOARD_ROWS],
+                board: [[BoardCell::default(); BOARD_COLS]; BOARD_ROWS],
                 secret: *secret,
                 templates: templates.iter().flat_map(|x| x.iter().cloned()).collect(),
             })
@@ -100,11 +101,49 @@ pub struct Player {
     secret: Color,
     templates: Vec<BoardTemplate>,
 }
+impl Player {
+    fn select_template(&mut self, idx: usize) {
+        let template = &self.templates[idx];
+        self.tokens = template.value;
+        for i in 0..BOARD_ROWS {
+            for j in 0..BOARD_COLS {
+                self.board[i][j].slot = template.slots[i][j];
+            }
+        }
+    }
+    fn calculate_score(&self, objectives: &[Objective]) -> i32 {
+        // One point for each die matching our secret color, and minus one
+        // point for each slot without a die in it.
+        let mut score = self
+            .board
+            .iter()
+            .flatten()
+            .map(|cell| match cell.die {
+                Some(die) if die.color == self.secret => 1,
+                None => -1,
+                _ => 0,
+            })
+            .sum::<i32>();
+        // Add the scores for the objectives.
+        for obj in objectives.iter() {
+            score += obj.score(&self.board);
+        }
+        score
+    }
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum BoardCell {
-    Dice(Dice),
-    Slot(Slot),
+pub struct BoardCell {
+    slot: Slot,
+    die: Option<Dice>,
+}
+impl Default for BoardCell {
+    fn default() -> Self {
+        Self {
+            slot: Slot::Any,
+            die: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -128,7 +167,7 @@ pub enum Slot {
     Face(u8),
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum Color {
     Red,
     Yellow,
@@ -157,6 +196,38 @@ pub enum Objective {
     Pair56(i32),
     ColorDiagonals(i32),
 }
+impl Objective {
+    pub fn score(self, board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS]) -> i32 {
+        match self {
+            Objective::ColumnNumbers(_n) => {
+                todo!("ColumnNumbers")
+            }
+            Objective::RowNumbers(_n) => {
+                todo!("RowNumbers")
+            }
+            Objective::Numbers(n) => n * (1..=6).map(|i| count_number(board, i)).min().unwrap_or(0),
+            Objective::ColumnColors(_n) => {
+                todo!("ColumnColors")
+            }
+            Objective::RowColors(_n) => {
+                todo!("RowColors")
+            }
+            Objective::Colors(n) => {
+                n * ALL_COLORS
+                    .iter()
+                    .map(|&c| count_color(board, c))
+                    .min()
+                    .unwrap_or(0)
+            }
+            Objective::Pair12(n) => n * count_number(board, 1).min(count_number(board, 2)),
+            Objective::Pair34(n) => n * count_number(board, 3).min(count_number(board, 4)),
+            Objective::Pair56(n) => n * count_number(board, 5).min(count_number(board, 6)),
+            Objective::ColorDiagonals(_n) => {
+                todo!("ColorDiagonals")
+            }
+        }
+    }
+}
 const ALL_OBJECTIVES: [Objective; 10] = [
     Objective::ColumnNumbers(4),
     Objective::RowNumbers(5),
@@ -169,6 +240,21 @@ const ALL_OBJECTIVES: [Objective; 10] = [
     Objective::Pair56(2),
     Objective::ColorDiagonals(1),
 ];
+
+fn count_number(board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS], n: u8) -> i32 {
+    board
+        .iter()
+        .flatten()
+        .filter(|cell| matches!(cell.die, Some(Dice { face, .. }) if face == n))
+        .count() as i32
+}
+fn count_color(board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS], c: Color) -> i32 {
+    board
+        .iter()
+        .flatten()
+        .filter(|cell| matches!(cell.die, Some(Dice { color, .. }) if color == c))
+        .count() as i32
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tool {
