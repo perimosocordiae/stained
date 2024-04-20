@@ -9,17 +9,17 @@ const NUM_TOOLS: usize = 3;
 const MAX_PLAYERS: usize = 4;
 const NUM_COLORS: usize = 5;
 const DICE_PER_COLOR: usize = (2 * MAX_PLAYERS + 1) * NUM_ROUNDS / NUM_COLORS;
-const BOARD_ROWS: usize = 4;
-const BOARD_COLS: usize = 5;
+pub const BOARD_ROWS: usize = 4;
+pub const BOARD_COLS: usize = 5;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
     players: Vec<Player>,
     start_player_idx: usize,
     curr_player_idx: usize,
-    phase: TurnPhase,
+    pub phase: TurnPhase,
     dice_bag: Vec<Color>,
-    draft_pool: Vec<Dice>,
+    pub draft_pool: Vec<Dice>,
     round_track: Vec<Dice>,
     tools: Vec<Tool>,
     objectives: Vec<Objective>,
@@ -86,6 +86,9 @@ impl GameState {
     fn pool_size(&self) -> usize {
         2 * self.players.len() + 1
     }
+    pub fn current_player(&self) -> &Player {
+        &self.players[self.curr_player_idx]
+    }
     pub fn take_turn(&mut self, action: TurnAction) -> Result<bool, DynError> {
         match self.phase {
             TurnPhase::SelectTemplate => {
@@ -139,7 +142,12 @@ impl GameState {
         self.phase = TurnPhase::FirstDraft;
     }
     fn finish_round(&mut self) {
-        assert_eq!(self.draft_pool.len(), 1);
+        assert_eq!(
+            self.draft_pool.len(),
+            1,
+            "Draft pool should have one die left, got {}",
+            self.draft_pool.len()
+        );
         self.round_track.push(self.draft_pool.pop().unwrap());
         self.start_player_idx = self.next_idx(self.start_player_idx);
     }
@@ -159,19 +167,19 @@ pub enum TurnPhase {
     GameOver,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TurnAction {
-    idx: usize,
-    coords: Option<(usize, usize)>,
+    pub idx: usize,
+    pub coords: Option<(usize, usize)>,
     // TODO: tool selection
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Player {
-    tokens: u8,
-    board: [[BoardCell; BOARD_COLS]; BOARD_ROWS],
-    secret: Color,
-    templates: Vec<BoardTemplate>,
+    pub tokens: u8,
+    pub board: [[BoardCell; BOARD_COLS]; BOARD_ROWS],
+    pub secret: Color,
+    pub templates: Vec<BoardTemplate>,
 }
 impl Player {
     fn select_template(&mut self, idx: usize) -> Result<(), DynError> {
@@ -187,25 +195,31 @@ impl Player {
         }
         Ok(())
     }
-    fn place_die(&mut self, coords: (usize, usize), die: Dice) -> Result<(), DynError> {
+    pub fn can_place_die(&self, coords: (usize, usize), die: Dice) -> Option<&str> {
         if !(0..BOARD_ROWS).contains(&coords.0) || !(0..BOARD_COLS).contains(&coords.1) {
-            return Err("Invalid coordinates".into());
+            return Some("Invalid coordinates");
         }
-        let cell = &mut self.board[coords.0][coords.1];
+        let cell = &self.board[coords.0][coords.1];
         if cell.die.is_some() {
-            return Err("Cell is already occupied".into());
+            return Some("Cell is already occupied");
         }
         match cell.slot {
             Slot::Color(color) if color != die.color => {
-                return Err("Die color does not match slot".into());
+                return Some("Die color does not match slot");
             }
             Slot::Face(face) if face != die.face => {
-                return Err("Die face does not match slot".into());
+                return Some("Die face does not match slot");
             }
             _ => {}
         }
         // TODO: check adjacency rules here
-        cell.die = Some(die);
+        None
+    }
+    fn place_die(&mut self, coords: (usize, usize), die: Dice) -> Result<(), DynError> {
+        if let Some(msg) = self.can_place_die(coords, die) {
+            return Err(msg.into());
+        }
+        self.board[coords.0][coords.1].die = Some(die);
         Ok(())
     }
     fn calculate_score(&self, objectives: &[Objective]) -> i32 {
