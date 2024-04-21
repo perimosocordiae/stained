@@ -21,10 +21,10 @@ pub struct GameState {
 }
 impl GameState {
     pub fn init(num_players: usize) -> Result<Self, DynError> {
-        if !(2..=4).contains(&num_players) {
+        if !(2..=MAX_PLAYERS).contains(&num_players) {
             return Err("Invalid number of players".into());
         }
-        let mut dice_bag = Vec::with_capacity(DICE_PER_COLOR * 5);
+        let mut dice_bag = Vec::with_capacity(DICE_PER_COLOR * NUM_COLORS);
         for _ in 0..DICE_PER_COLOR {
             dice_bag.extend_from_slice(ALL_COLORS.as_slice());
         }
