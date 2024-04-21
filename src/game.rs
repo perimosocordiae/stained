@@ -118,7 +118,6 @@ impl GameState {
                 let coords = action.coords.unwrap();
                 let die = self.draft_pool.remove(action.idx);
                 self.players[self.curr_player_idx].place_die(coords, die)?;
-                self.curr_player_idx = self.prev_idx(self.curr_player_idx);
                 if self.curr_player_idx == self.start_player_idx {
                     self.finish_round();
                     if self.is_finished() {
@@ -126,6 +125,8 @@ impl GameState {
                     } else {
                         self.start_round();
                     }
+                } else {
+                    self.curr_player_idx = self.prev_idx(self.curr_player_idx);
                 }
             }
             TurnPhase::GameOver => return Err("Game is over".into()),
