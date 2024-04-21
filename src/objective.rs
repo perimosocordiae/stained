@@ -16,6 +16,20 @@ pub enum Objective {
     Pair56(i32),
     ColorDiagonals(i32),
 }
+
+pub const ALL_OBJECTIVES: [Objective; 10] = [
+    Objective::ColumnNumbers(4),
+    Objective::RowNumbers(5),
+    Objective::Numbers(5),
+    Objective::ColumnColors(5),
+    Objective::RowColors(6),
+    Objective::Colors(4),
+    Objective::Pair12(2),
+    Objective::Pair34(2),
+    Objective::Pair56(2),
+    Objective::ColorDiagonals(1),
+];
+
 impl Objective {
     pub fn score(self, board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS]) -> i32 {
         match self {
@@ -48,18 +62,6 @@ impl Objective {
         }
     }
 }
-pub const ALL_OBJECTIVES: [Objective; 10] = [
-    Objective::ColumnNumbers(4),
-    Objective::RowNumbers(5),
-    Objective::Numbers(5),
-    Objective::ColumnColors(5),
-    Objective::RowColors(6),
-    Objective::Colors(4),
-    Objective::Pair12(2),
-    Objective::Pair34(2),
-    Objective::Pair56(2),
-    Objective::ColorDiagonals(1),
-];
 
 fn count_number(board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS], n: u8) -> i32 {
     board
