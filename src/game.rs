@@ -126,11 +126,12 @@ impl GameState {
         Ok(matches!(self.phase, TurnPhase::GameOver))
     }
     fn start_round(&mut self) {
+        let mut rng = rand::thread_rng();
         self.draft_pool = self
             .dice_bag
             .split_off(self.dice_bag.len() - self.pool_size())
             .into_iter()
-            .map(roll_die)
+            .map(|color| Dice::roll(color, &mut rng))
             .collect();
         self.phase = TurnPhase::FirstDraft;
     }
@@ -277,14 +278,6 @@ fn diagonal_coords(coords: (usize, usize)) -> impl Iterator<Item = (usize, usize
     ]
     .into_iter()
     .filter(|(r, c)| *r < BOARD_ROWS && *c < BOARD_COLS)
-}
-
-fn roll_die(color: Color) -> Dice {
-    let mut rng = rand::thread_rng();
-    Dice {
-        color,
-        face: (1..=6).choose(&mut rng).unwrap_or(1),
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

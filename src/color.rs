@@ -1,4 +1,5 @@
 use crate::constants::NUM_COLORS;
+use rand::prelude::IteratorRandom;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
@@ -38,5 +39,11 @@ pub struct Dice {
 impl Display for Dice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", self.color, self.face)
+    }
+}
+impl Dice {
+    pub fn roll(color: Color, rng: &mut impl rand::Rng) -> Self {
+        let face = (1..=6).choose(rng).unwrap_or(1);
+        Self { color, face }
     }
 }
