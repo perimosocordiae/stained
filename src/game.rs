@@ -310,7 +310,7 @@ impl Display for Dice {
     }
 }
 
-pub fn roll_die(color: Color) -> Dice {
+fn roll_die(color: Color) -> Dice {
     let mut rng = rand::thread_rng();
     Dice {
         color,
@@ -332,7 +332,7 @@ pub enum Objective {
     ColorDiagonals(i32),
 }
 impl Objective {
-    pub fn score(self, board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS]) -> i32 {
+    fn score(self, board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS]) -> i32 {
         match self {
             Objective::ColumnNumbers(_n) => {
                 todo!("ColumnNumbers")
