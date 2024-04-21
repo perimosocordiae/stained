@@ -1,4 +1,5 @@
-use crate::game::{GameState, Player, TurnAction, TurnPhase, BOARD_COLS, BOARD_ROWS};
+use crate::constants::{BOARD_COLS, BOARD_ROWS};
+use crate::game::{GameState, Player, TurnAction, TurnPhase};
 use rand::prelude::IteratorRandom;
 
 pub trait Agent {
