@@ -1,4 +1,5 @@
-use crate::constants::{BOARD_COLS, BOARD_ROWS, NUM_COLORS};
+use crate::color::Color;
+use crate::constants::{BOARD_COLS, BOARD_ROWS};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
@@ -17,34 +18,6 @@ impl Display for Slot {
         }
     }
 }
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum Color {
-    Red,
-    Yellow,
-    Green,
-    Blue,
-    Purple,
-}
-impl Display for Color {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let color = match self {
-            Color::Red => "R",
-            Color::Yellow => "Y",
-            Color::Green => "G",
-            Color::Blue => "B",
-            Color::Purple => "P",
-        };
-        write!(f, "{}", color)
-    }
-}
-pub const ALL_COLORS: [Color; NUM_COLORS] = [
-    Color::Red,
-    Color::Yellow,
-    Color::Green,
-    Color::Blue,
-    Color::Purple,
-];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoardTemplate {

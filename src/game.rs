@@ -1,7 +1,8 @@
-use std::fmt::Display;
-
+use crate::board::BoardCell;
+use crate::color::{Color, Dice, ALL_COLORS};
 use crate::constants::*;
-use crate::template::{Color, Slot, BoardTemplate, ALL_BOARD_TEMPLATES, ALL_COLORS};
+use crate::objective::{Objective, ALL_OBJECTIVES};
+use crate::template::{BoardTemplate, Slot, ALL_BOARD_TEMPLATES};
 use rand::{prelude::SliceRandom, seq::IteratorRandom};
 use serde::{Deserialize, Serialize};
 
@@ -276,119 +277,12 @@ fn diagonal_coords(coords: (usize, usize)) -> impl Iterator<Item = (usize, usize
     .filter(|(r, c)| *r < BOARD_ROWS && *c < BOARD_COLS)
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct BoardCell {
-    slot: Slot,
-    die: Option<Dice>,
-}
-impl Default for BoardCell {
-    fn default() -> Self {
-        Self {
-            slot: Slot::Any,
-            die: None,
-        }
-    }
-}
-impl Display for BoardCell {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(die) = self.die {
-            write!(f, "{}", die)
-        } else {
-            write!(f, "{}", self.slot)
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct Dice {
-    color: Color,
-    face: u8,
-}
-impl Display for Dice {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", self.color, self.face)
-    }
-}
-
 fn roll_die(color: Color) -> Dice {
     let mut rng = rand::thread_rng();
     Dice {
         color,
         face: (1..=6).choose(&mut rng).unwrap_or(1),
     }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum Objective {
-    ColumnNumbers(i32),
-    RowNumbers(i32),
-    Numbers(i32),
-    ColumnColors(i32),
-    RowColors(i32),
-    Colors(i32),
-    Pair12(i32),
-    Pair34(i32),
-    Pair56(i32),
-    ColorDiagonals(i32),
-}
-impl Objective {
-    fn score(self, board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS]) -> i32 {
-        match self {
-            Objective::ColumnNumbers(_n) => {
-                todo!("ColumnNumbers")
-            }
-            Objective::RowNumbers(_n) => {
-                todo!("RowNumbers")
-            }
-            Objective::Numbers(n) => n * (1..=6).map(|i| count_number(board, i)).min().unwrap_or(0),
-            Objective::ColumnColors(_n) => {
-                todo!("ColumnColors")
-            }
-            Objective::RowColors(_n) => {
-                todo!("RowColors")
-            }
-            Objective::Colors(n) => {
-                n * ALL_COLORS
-                    .iter()
-                    .map(|&c| count_color(board, c))
-                    .min()
-                    .unwrap_or(0)
-            }
-            Objective::Pair12(n) => n * count_number(board, 1).min(count_number(board, 2)),
-            Objective::Pair34(n) => n * count_number(board, 3).min(count_number(board, 4)),
-            Objective::Pair56(n) => n * count_number(board, 5).min(count_number(board, 6)),
-            Objective::ColorDiagonals(_n) => {
-                todo!("ColorDiagonals")
-            }
-        }
-    }
-}
-const ALL_OBJECTIVES: [Objective; 10] = [
-    Objective::ColumnNumbers(4),
-    Objective::RowNumbers(5),
-    Objective::Numbers(5),
-    Objective::ColumnColors(5),
-    Objective::RowColors(6),
-    Objective::Colors(4),
-    Objective::Pair12(2),
-    Objective::Pair34(2),
-    Objective::Pair56(2),
-    Objective::ColorDiagonals(1),
-];
-
-fn count_number(board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS], n: u8) -> i32 {
-    board
-        .iter()
-        .flatten()
-        .filter(|cell| matches!(cell.die, Some(Dice { face, .. }) if face == n))
-        .count() as i32
-}
-fn count_color(board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS], c: Color) -> i32 {
-    board
-        .iter()
-        .flatten()
-        .filter(|cell| matches!(cell.die, Some(Dice { color, .. }) if color == c))
-        .count() as i32
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
