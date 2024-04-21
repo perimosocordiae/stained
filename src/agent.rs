@@ -22,7 +22,11 @@ impl Agent for RandomAgent {
             }
             TurnPhase::FirstDraft | TurnPhase::SecondDraft => {
                 let choices = all_valid_drafts(game, me);
-                choices.into_iter().choose(&mut rng).unwrap()
+                if let Some(action) = choices.into_iter().choose(&mut rng) {
+                    action
+                } else {
+                    TurnAction::default() // Pass
+                }
             }
             TurnPhase::GameOver => TurnAction::default(),
         }
@@ -57,11 +61,11 @@ mod tests {
         // Select templates
         game.take_turn(agent.choose_action(&game)).unwrap();
         game.take_turn(agent.choose_action(&game)).unwrap();
-        // First draft
-        game.take_turn(agent.choose_action(&game)).unwrap();
-        game.take_turn(agent.choose_action(&game)).unwrap();
-        // Second draft
-        game.take_turn(agent.choose_action(&game)).unwrap();
-        game.take_turn(agent.choose_action(&game)).unwrap();
+        // Play 10 rounds, 2 drafts each, 2 players
+        for _ in 0..(2 * 2 * 10) {
+            game.take_turn(agent.choose_action(&game)).unwrap();
+        }
+        // Check that we are in the GameOver phase
+        assert!(matches!(game.phase, TurnPhase::GameOver));
     }
 }

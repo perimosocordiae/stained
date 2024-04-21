@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use rand::{prelude::SliceRandom, seq::IteratorRandom};
 use serde::{Deserialize, Serialize};
 
@@ -20,7 +22,7 @@ pub struct GameState {
     pub phase: TurnPhase,
     dice_bag: Vec<Color>,
     pub draft_pool: Vec<Dice>,
-    round_track: Vec<Dice>,
+    round_track: Vec<Vec<Dice>>,
     tools: Vec<Tool>,
     objectives: Vec<Objective>,
 }
@@ -99,12 +101,10 @@ impl GameState {
                 }
             }
             TurnPhase::FirstDraft => {
-                if action.coords.is_none() {
-                    return Err("Missing destination coordinates".into());
+                if let Some(coords) = action.coords {
+                    let die = self.draft_pool.remove(action.idx);
+                    self.players[self.curr_player_idx].place_die(coords, die)?;
                 }
-                let coords = action.coords.unwrap();
-                let die = self.draft_pool.remove(action.idx);
-                self.players[self.curr_player_idx].place_die(coords, die)?;
                 self.curr_player_idx = self.next_idx(self.curr_player_idx);
                 if self.curr_player_idx == self.start_player_idx {
                     self.curr_player_idx = self.prev_idx(self.curr_player_idx);
@@ -112,12 +112,10 @@ impl GameState {
                 }
             }
             TurnPhase::SecondDraft => {
-                if action.coords.is_none() {
-                    return Err("Missing destination coordinates".into());
+                if let Some(coords) = action.coords {
+                    let die = self.draft_pool.remove(action.idx);
+                    self.players[self.curr_player_idx].place_die(coords, die)?;
                 }
-                let coords = action.coords.unwrap();
-                let die = self.draft_pool.remove(action.idx);
-                self.players[self.curr_player_idx].place_die(coords, die)?;
                 if self.curr_player_idx == self.start_player_idx {
                     self.finish_round();
                     if self.is_finished() {
@@ -143,14 +141,10 @@ impl GameState {
         self.phase = TurnPhase::FirstDraft;
     }
     fn finish_round(&mut self) {
-        assert_eq!(
-            self.draft_pool.len(),
-            1,
-            "Draft pool should have one die left, got {}",
-            self.draft_pool.len()
-        );
-        self.round_track.push(self.draft_pool.pop().unwrap());
+        // Any remaining dice in the draft pool are moved to the round track.
+        self.round_track.push(self.draft_pool.drain(..).collect());
         self.start_player_idx = self.next_idx(self.start_player_idx);
+        self.curr_player_idx = self.start_player_idx;
     }
     pub fn player_scores(&self) -> Vec<i32> {
         self.players
@@ -213,7 +207,28 @@ impl Player {
             }
             _ => {}
         }
-        // TODO: check adjacency rules here
+        // Check orthogonally adjacent cells.
+        let nbr_dice: Vec<Dice> = neighbor_coords(coords)
+            .filter_map(|(r, c)| self.board[r][c].die)
+            .collect();
+        for ndr_die in nbr_dice.iter() {
+            if die.color == ndr_die.color {
+                return Some("Die color matches orthogonally adjacent die");
+            } else if die.face == ndr_die.face {
+                return Some("Die face matches orthogonally adjacent die");
+            }
+        }
+        // Check diagonally adjacent cells if we don't have any orthogonally adjacent dice.
+        if nbr_dice.is_empty()
+            && diagonal_coords(coords).any(|(r, c)| self.board[r][c].die.is_some())
+        {
+            if self.board.iter().flatten().any(|cell| cell.die.is_some()) {
+                return Some("Die must be placed adjacent to another die");
+            }
+            if (1..BOARD_ROWS - 1).contains(&coords.0) && (1..BOARD_COLS - 1).contains(&coords.1) {
+                return Some("First die must be placed on the edge");
+            }
+        }
         None
     }
     fn place_die(&mut self, coords: (usize, usize), die: Dice) -> Result<(), DynError> {
@@ -244,6 +259,30 @@ impl Player {
     }
 }
 
+fn neighbor_coords(coords: (usize, usize)) -> impl Iterator<Item = (usize, usize)> {
+    let (r, c) = coords;
+    [
+        (r, c.wrapping_sub(1)),
+        (r, c + 1),
+        (r.wrapping_sub(1), c),
+        (r + 1, c),
+    ]
+    .into_iter()
+    .filter(|(r, c)| *r < BOARD_ROWS && *c < BOARD_COLS)
+}
+
+fn diagonal_coords(coords: (usize, usize)) -> impl Iterator<Item = (usize, usize)> {
+    let (r, c) = coords;
+    [
+        (r.wrapping_sub(1), c.wrapping_sub(1)),
+        (r.wrapping_sub(1), c + 1),
+        (r + 1, c.wrapping_sub(1)),
+        (r + 1, c + 1),
+    ]
+    .into_iter()
+    .filter(|(r, c)| *r < BOARD_ROWS && *c < BOARD_COLS)
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct BoardCell {
     slot: Slot,
@@ -257,11 +296,25 @@ impl Default for BoardCell {
         }
     }
 }
+impl Display for BoardCell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(die) = self.die {
+            write!(f, "{}", die)
+        } else {
+            write!(f, "{}", self.slot)
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Dice {
     color: Color,
     face: u8,
+}
+impl Display for Dice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.color, self.face)
+    }
 }
 
 pub fn roll_die(color: Color) -> Dice {
@@ -278,6 +331,15 @@ pub enum Slot {
     Color(Color),
     Face(u8),
 }
+impl Display for Slot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Slot::Any => write!(f, "__"),
+            Slot::Color(color) => write!(f, "{}_", color),
+            Slot::Face(face) => write!(f, "_{}", face),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum Color {
@@ -286,6 +348,18 @@ pub enum Color {
     Green,
     Blue,
     Purple,
+}
+impl Display for Color {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let color = match self {
+            Color::Red => "R",
+            Color::Yellow => "Y",
+            Color::Green => "G",
+            Color::Blue => "B",
+            Color::Purple => "P",
+        };
+        write!(f, "{}", color)
+    }
 }
 const ALL_COLORS: [Color; NUM_COLORS] = [
     Color::Red,
