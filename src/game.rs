@@ -245,6 +245,8 @@ impl Player {
                 _ => 0,
             })
             .sum::<i32>();
+        // Add one point per token.
+        score += self.tokens as i32;
         // Add the scores for the objectives.
         for obj in objectives.iter() {
             score += obj.score(&self.board);
