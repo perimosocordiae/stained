@@ -3,6 +3,7 @@ use crate::color::{Color, Dice, ALL_COLORS};
 use crate::constants::*;
 use crate::objective::{Objective, ALL_OBJECTIVES};
 use crate::template::{BoardTemplate, Slot, ALL_BOARD_TEMPLATES};
+use crate::tool::{Tool, ALL_TOOL_TYPES};
 use rand::{prelude::SliceRandom, seq::IteratorRandom};
 use serde::{Deserialize, Serialize};
 
@@ -279,42 +280,3 @@ fn diagonal_coords(coords: (usize, usize)) -> impl Iterator<Item = (usize, usize
     .into_iter()
     .filter(|(r, c)| *r < BOARD_ROWS && *c < BOARD_COLS)
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Tool {
-    tool_type: ToolType,
-    cost: u8,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum ToolType {
-    // Tools that modify the draft pool.
-    BumpDraftedDie, // +/- 1
-    FlipDraftedDie, // 1 <-> 6, 2 <-> 5, 3 <-> 4
-    RerollDraftedDie,
-    SwapDraftedDieWithRoundTrack,
-    SwapDraftedDieWithBag,
-    RerollAllDiceInPool, // only before second draft
-    // Tools that move dice already on the board.
-    MoveDieIgnoringColor,
-    MoveDieIgnoringValue,
-    MoveExactlyTwoDice,
-    MoveUpToTwoDiceMatchingColor, // must match a color on the round track
-    // Tools that break a rule.
-    DraftTwoDice, // only before first draft, skips second draft
-    PlaceIgnoringAdjacency,
-}
-const ALL_TOOL_TYPES: [ToolType; 12] = [
-    ToolType::BumpDraftedDie,
-    ToolType::FlipDraftedDie,
-    ToolType::RerollDraftedDie,
-    ToolType::SwapDraftedDieWithRoundTrack,
-    ToolType::SwapDraftedDieWithBag,
-    ToolType::RerollAllDiceInPool,
-    ToolType::MoveDieIgnoringColor,
-    ToolType::MoveDieIgnoringValue,
-    ToolType::MoveExactlyTwoDice,
-    ToolType::MoveUpToTwoDiceMatchingColor,
-    ToolType::DraftTwoDice,
-    ToolType::PlaceIgnoringAdjacency,
-];

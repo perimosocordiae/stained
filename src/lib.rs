@@ -5,3 +5,4 @@ mod constants;
 pub mod game;
 mod objective;
 mod template;
+mod tool;
