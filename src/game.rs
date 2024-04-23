@@ -86,20 +86,21 @@ impl GameState {
     pub fn current_player(&self) -> &Player {
         &self.players[self.curr_player_idx]
     }
-    pub fn take_turn(&mut self, action: TurnAction) -> Result<bool, DynError> {
+    pub fn take_turn(&mut self, action: &TurnAction) -> Result<bool, DynError> {
         match self.phase {
             TurnPhase::SelectTemplate => {
-                self.players[self.curr_player_idx].select_template(action.idx)?;
+                if let ActionType::SelectTemplate(idx) = action.idx {
+                    self.players[self.curr_player_idx].select_template(idx)?;
+                } else {
+                    return Err("Invalid action: must select a template".into());
+                }
                 self.curr_player_idx = self.next_idx(self.curr_player_idx);
                 if self.curr_player_idx == self.start_player_idx {
                     self.start_round();
                 }
             }
             TurnPhase::FirstDraft => {
-                if let Some(coords) = action.coords {
-                    let die = self.draft_pool.remove(action.idx);
-                    self.players[self.curr_player_idx].place_die(coords, die)?;
-                }
+                self.handle_action(action)?;
                 self.curr_player_idx = self.next_idx(self.curr_player_idx);
                 if self.curr_player_idx == self.start_player_idx {
                     self.curr_player_idx = self.prev_idx(self.curr_player_idx);
@@ -107,10 +108,7 @@ impl GameState {
                 }
             }
             TurnPhase::SecondDraft => {
-                if let Some(coords) = action.coords {
-                    let die = self.draft_pool.remove(action.idx);
-                    self.players[self.curr_player_idx].place_die(coords, die)?;
-                }
+                self.handle_action(action)?;
                 if self.curr_player_idx == self.start_player_idx {
                     self.finish_round();
                     if self.is_finished() {
@@ -125,6 +123,24 @@ impl GameState {
             TurnPhase::GameOver => return Err("Game is over".into()),
         }
         Ok(matches!(self.phase, TurnPhase::GameOver))
+    }
+    fn handle_action(&mut self, action: &TurnAction) -> Result<(), DynError> {
+        match action.idx {
+            ActionType::SelectTemplate(_) => {
+                Err("Invalid action: templates have already been selected".into())
+            }
+            ActionType::DraftDie(idx) => {
+                if let Some(coords) = action.coords {
+                    self.draft_pool.get(idx).ok_or("Invalid die index")?;
+                    let die = self.draft_pool.remove(idx);
+                    self.players[self.curr_player_idx].place_die(coords, die)?;
+                }
+                Ok(())
+            }
+            ActionType::UseTool(_idx) => {
+                todo!("Implement tool usage")
+            }
+        }
     }
     fn start_round(&mut self) {
         let mut rng = rand::thread_rng();
@@ -158,11 +174,25 @@ pub enum TurnPhase {
     GameOver,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TurnAction {
-    pub idx: usize,
+    pub idx: ActionType,
     pub coords: Option<(usize, usize)>,
-    // TODO: tool selection
+}
+impl TurnAction {
+    pub fn pass() -> Self {
+        Self {
+            idx: ActionType::DraftDie(0),
+            coords: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ActionType {
+    SelectTemplate(usize),
+    DraftDie(usize),
+    UseTool(usize),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -174,10 +204,7 @@ pub struct Player {
 }
 impl Player {
     fn select_template(&mut self, idx: usize) -> Result<(), DynError> {
-        if !(0..self.templates.len()).contains(&idx) {
-            return Err("Invalid template index".into());
-        }
-        let template = &self.templates[idx];
+        let template = self.templates.get(idx).ok_or("Invalid template index")?;
         self.tokens = template.value;
         for i in 0..BOARD_ROWS {
             for j in 0..BOARD_COLS {
@@ -186,20 +213,18 @@ impl Player {
         }
         Ok(())
     }
-    pub fn can_place_die(&self, coords: (usize, usize), die: Dice) -> Option<&str> {
-        if !(0..BOARD_ROWS).contains(&coords.0) || !(0..BOARD_COLS).contains(&coords.1) {
-            return Some("Invalid coordinates");
-        }
-        let cell = &self.board[coords.0][coords.1];
+    pub fn can_place_die(&self, coords: (usize, usize), die: Dice) -> Result<(), DynError> {
+        let row = self.board.get(coords.0).ok_or("Invalid row")?;
+        let cell = row.get(coords.1).ok_or("Invalid column")?;
         if cell.die.is_some() {
-            return Some("Cell is already occupied");
+            return Err("Cell is already occupied".into());
         }
         match cell.slot {
             Slot::Color(color) if color != die.color => {
-                return Some("Die color does not match slot");
+                return Err("Die color does not match slot".into());
             }
             Slot::Face(face) if face != die.face => {
-                return Some("Die face does not match slot");
+                return Err("Die face does not match slot".into());
             }
             _ => {}
         }
@@ -209,9 +234,9 @@ impl Player {
             .collect();
         for ndr_die in nbr_dice.iter() {
             if die.color == ndr_die.color {
-                return Some("Die color matches orthogonally adjacent die");
+                return Err("Die color matches orthogonally adjacent die".into());
             } else if die.face == ndr_die.face {
-                return Some("Die face matches orthogonally adjacent die");
+                return Err("Die face matches orthogonally adjacent die".into());
             }
         }
         // Check diagonally adjacent cells if we don't have any orthogonally adjacent dice.
@@ -219,18 +244,16 @@ impl Player {
             && diagonal_coords(coords).any(|(r, c)| self.board[r][c].die.is_some())
         {
             if self.board.iter().flatten().any(|cell| cell.die.is_some()) {
-                return Some("Die must be placed adjacent to another die");
+                return Err("Die must be placed adjacent to another die".into());
             }
             if (1..BOARD_ROWS - 1).contains(&coords.0) && (1..BOARD_COLS - 1).contains(&coords.1) {
-                return Some("First die must be placed on the edge");
+                return Err("First die must be placed on the edge".into());
             }
         }
-        None
+        Ok(())
     }
     fn place_die(&mut self, coords: (usize, usize), die: Dice) -> Result<(), DynError> {
-        if let Some(msg) = self.can_place_die(coords, die) {
-            return Err(msg.into());
-        }
+        self.can_place_die(coords, die)?;
         self.board[coords.0][coords.1].die = Some(die);
         Ok(())
     }
