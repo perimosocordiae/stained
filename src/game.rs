@@ -4,6 +4,7 @@ use crate::constants::*;
 use crate::objective::{Objective, ALL_OBJECTIVES};
 use crate::template::{BoardTemplate, Slot, ALL_BOARD_TEMPLATES};
 use crate::tool::{Tool, ALL_TOOL_TYPES};
+use crate::turn::{ActionType, TurnAction, TurnPhase};
 use rand::{prelude::SliceRandom, seq::IteratorRandom};
 use serde::{Deserialize, Serialize};
 
@@ -87,6 +88,10 @@ impl GameState {
         &self.players[self.curr_player_idx]
     }
     pub fn take_turn(&mut self, action: &TurnAction) -> Result<bool, DynError> {
+        println!(
+            "{:?} (P{}) => {:?}",
+            self.phase, self.curr_player_idx, action
+        );
         match self.phase {
             TurnPhase::SelectTemplate => {
                 if let ActionType::SelectTemplate(idx) = action.idx {
@@ -137,8 +142,16 @@ impl GameState {
                 }
                 Ok(())
             }
-            ActionType::UseTool(_idx) => {
-                todo!("Implement tool usage")
+            ActionType::UseTool(idx) => {
+                let tool = self.tools.get(idx).ok_or("Invalid tool index")?;
+                if tool.in_wrong_phase(self.phase) {
+                    return Err("Cannot use this tool now".into());
+                }
+                self.players[self.curr_player_idx].use_tool(tool, action.coords)?;
+                if tool.cost == 1 {
+                    self.tools[idx].cost = 2;
+                }
+                Ok(())
             }
         }
     }
@@ -164,35 +177,6 @@ impl GameState {
             .map(|player| player.calculate_score(&self.objectives))
             .collect()
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum TurnPhase {
-    SelectTemplate,
-    FirstDraft,
-    SecondDraft,
-    GameOver,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TurnAction {
-    pub idx: ActionType,
-    pub coords: Option<(usize, usize)>,
-}
-impl TurnAction {
-    pub fn pass() -> Self {
-        Self {
-            idx: ActionType::DraftDie(0),
-            coords: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ActionType {
-    SelectTemplate(usize),
-    DraftDie(usize),
-    UseTool(usize),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -256,6 +240,16 @@ impl Player {
         self.can_place_die(coords, die)?;
         self.board[coords.0][coords.1].die = Some(die);
         Ok(())
+    }
+    fn can_use_tool(&self, tool: &Tool) -> Result<(), DynError> {
+        if tool.cost > self.tokens {
+            return Err("Insufficient tokens to use tool".into());
+        }
+        Ok(())
+    }
+    fn use_tool(&mut self, tool: &Tool, _coords: Option<(usize, usize)>) -> Result<(), DynError> {
+        self.can_use_tool(tool)?;
+        todo!("Implement tool usage")
     }
     fn calculate_score(&self, objectives: &[Objective]) -> i32 {
         // One point for each die matching our secret color, and minus one

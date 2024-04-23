@@ -1,9 +1,21 @@
+use crate::turn::TurnPhase;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tool {
     pub tool_type: ToolType,
     pub cost: u8,
+}
+impl Tool {
+    pub fn in_wrong_phase(&self, phase: TurnPhase) -> bool {
+        matches!(
+            (phase, self.tool_type),
+            (TurnPhase::SelectTemplate, _)
+                | (TurnPhase::GameOver, _)
+                | (TurnPhase::FirstDraft, ToolType::RerollAllDiceInPool)
+                | (TurnPhase::SecondDraft, ToolType::DraftTwoDice)
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
