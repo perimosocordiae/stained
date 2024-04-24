@@ -36,17 +36,18 @@ pub enum ToolType {
     DraftTwoDice, // only before first draft, skips second draft
     PlaceIgnoringAdjacency,
 }
-pub const ALL_TOOL_TYPES: [ToolType; 12] = [
-    ToolType::BumpDraftedDie,
+// TODO: Uncomment tools as they are implemented.
+pub const ALL_TOOL_TYPES: [ToolType; 4] = [
+    // ToolType::BumpDraftedDie,
     ToolType::FlipDraftedDie,
     ToolType::RerollDraftedDie,
-    ToolType::SwapDraftedDieWithRoundTrack,
-    ToolType::SwapDraftedDieWithBag,
+    // ToolType::SwapDraftedDieWithRoundTrack,
+    // ToolType::SwapDraftedDieWithBag,
     ToolType::RerollAllDiceInPool,
-    ToolType::MoveDieIgnoringColor,
-    ToolType::MoveDieIgnoringValue,
-    ToolType::MoveExactlyTwoDice,
-    ToolType::MoveUpToTwoDiceMatchingColor,
-    ToolType::DraftTwoDice,
+    // ToolType::MoveDieIgnoringColor,
+    // ToolType::MoveDieIgnoringValue,
+    // ToolType::MoveExactlyTwoDice,
+    // ToolType::MoveUpToTwoDiceMatchingColor,
+    // ToolType::DraftTwoDice,
     ToolType::PlaceIgnoringAdjacency,
 ];

@@ -46,4 +46,10 @@ impl Dice {
         let face = (1..=6).choose(rng).unwrap_or(1);
         Self { color, face }
     }
+    pub fn reroll(&mut self, rng: &mut impl rand::Rng) {
+        self.face = (1..=6).choose(rng).unwrap_or(1);
+    }
+    pub fn flip(&mut self) {
+        self.face = 7 - self.face;
+    }
 }

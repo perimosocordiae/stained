@@ -1,7 +1,7 @@
 use crate::constants::{BOARD_COLS, BOARD_ROWS};
 use crate::game::{GameState, Player};
 use crate::turn::{ActionType, TurnAction, TurnPhase};
-use rand::prelude::IteratorRandom;
+use rand::prelude::{IteratorRandom, SliceRandom};
 
 pub trait Agent {
     fn choose_action(&self, game: &GameState) -> TurnAction;
@@ -24,9 +24,10 @@ impl Agent for RandomAgent {
                 TurnAction { idx, coords: None }
             }
             TurnPhase::FirstDraft | TurnPhase::SecondDraft => {
-                let choices = all_valid_drafts(game, me);
-                if let Some(action) = choices.into_iter().choose(&mut rng) {
-                    action
+                if let Some(action) = all_valid_drafts(game, me).choose(&mut rng) {
+                    action.clone()
+                } else if let Some(action) = all_valid_tools(game, me).choose(&mut rng) {
+                    action.clone()
                 } else {
                     TurnAction::pass()
                 }
@@ -53,6 +54,19 @@ fn all_valid_drafts(game: &GameState, player: &Player) -> Vec<TurnAction> {
     valid_drafts
 }
 
+fn all_valid_tools(game: &GameState, player: &Player) -> Vec<TurnAction> {
+    game.tools
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, tool)| {
+            player.can_use_tool(tool).ok().map(|_| TurnAction {
+                idx: ActionType::UseTool(idx),
+                coords: None,
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -64,8 +78,8 @@ mod tests {
         // Select templates
         game.take_turn(&agent.choose_action(&game))?;
         game.take_turn(&agent.choose_action(&game))?;
-        // Play 10 rounds, 2 drafts each, 2 players
-        for _ in 0..(2 * 2 * 10) {
+        // Play until game is finished
+        while !game.is_finished() {
             game.take_turn(&agent.choose_action(&game))?;
         }
         // Check that we are in the GameOver phase

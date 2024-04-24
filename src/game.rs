@@ -3,7 +3,7 @@ use crate::color::{Color, Dice, ALL_COLORS};
 use crate::constants::*;
 use crate::objective::{Objective, ALL_OBJECTIVES};
 use crate::template::{BoardTemplate, Slot, ALL_BOARD_TEMPLATES};
-use crate::tool::{Tool, ALL_TOOL_TYPES};
+use crate::tool::{Tool, ToolType, ALL_TOOL_TYPES};
 use crate::turn::{ActionType, TurnAction, TurnPhase};
 use rand::{prelude::SliceRandom, seq::IteratorRandom};
 use serde::{Deserialize, Serialize};
@@ -19,7 +19,7 @@ pub struct GameState {
     dice_bag: Vec<Color>,
     pub draft_pool: Vec<Dice>,
     round_track: Vec<Vec<Dice>>,
-    tools: Vec<Tool>,
+    pub tools: Vec<Tool>,
     objectives: Vec<Objective>,
 }
 impl GameState {
@@ -46,6 +46,7 @@ impl GameState {
                 board: [[BoardCell::default(); BOARD_COLS]; BOARD_ROWS],
                 secret: *secret,
                 templates: templates.iter().flat_map(|x| x.iter().cloned()).collect(),
+                active_tool: None,
             })
             .collect();
 
@@ -72,7 +73,7 @@ impl GameState {
                 .collect(),
         })
     }
-    fn is_finished(&self) -> bool {
+    pub fn is_finished(&self) -> bool {
         self.round_track.len() >= NUM_ROUNDS && self.draft_pool.is_empty()
     }
     fn next_idx(&self, idx: usize) -> usize {
@@ -105,31 +106,33 @@ impl GameState {
                 }
             }
             TurnPhase::FirstDraft => {
-                self.handle_action(action)?;
-                self.curr_player_idx = self.next_idx(self.curr_player_idx);
-                if self.curr_player_idx == self.start_player_idx {
-                    self.curr_player_idx = self.prev_idx(self.curr_player_idx);
-                    self.phase = TurnPhase::SecondDraft;
+                if self.handle_action(action)? {
+                    self.curr_player_idx = self.next_idx(self.curr_player_idx);
+                    if self.curr_player_idx == self.start_player_idx {
+                        self.curr_player_idx = self.prev_idx(self.curr_player_idx);
+                        self.phase = TurnPhase::SecondDraft;
+                    }
                 }
             }
             TurnPhase::SecondDraft => {
-                self.handle_action(action)?;
-                if self.curr_player_idx == self.start_player_idx {
-                    self.finish_round();
-                    if self.is_finished() {
-                        self.phase = TurnPhase::GameOver;
+                if self.handle_action(action)? {
+                    if self.curr_player_idx == self.start_player_idx {
+                        self.finish_round();
+                        if self.is_finished() {
+                            self.phase = TurnPhase::GameOver;
+                        } else {
+                            self.start_round();
+                        }
                     } else {
-                        self.start_round();
+                        self.curr_player_idx = self.prev_idx(self.curr_player_idx);
                     }
-                } else {
-                    self.curr_player_idx = self.prev_idx(self.curr_player_idx);
                 }
             }
             TurnPhase::GameOver => return Err("Game is over".into()),
         }
         Ok(matches!(self.phase, TurnPhase::GameOver))
     }
-    fn handle_action(&mut self, action: &TurnAction) -> Result<(), DynError> {
+    fn handle_action(&mut self, action: &TurnAction) -> Result<bool, DynError> {
         match action.idx {
             ActionType::SelectTemplate(_) => {
                 Err("Invalid action: templates have already been selected".into())
@@ -140,18 +143,34 @@ impl GameState {
                     let die = self.draft_pool.remove(idx);
                     self.players[self.curr_player_idx].place_die(coords, die)?;
                 }
-                Ok(())
+                self.players[self.curr_player_idx].active_tool = None;
+                Ok(true)
             }
             ActionType::UseTool(idx) => {
                 let tool = self.tools.get(idx).ok_or("Invalid tool index")?;
                 if tool.in_wrong_phase(self.phase) {
                     return Err("Cannot use this tool now".into());
                 }
-                self.players[self.curr_player_idx].use_tool(tool, action.coords)?;
+                self.current_player().can_use_tool(tool)?;
+                match tool.tool_type {
+                    ToolType::RerollAllDiceInPool => {
+                        let mut rng = rand::thread_rng();
+                        self.draft_pool
+                            .iter_mut()
+                            .for_each(|die| die.reroll(&mut rng));
+                    }
+                    ToolType::PlaceIgnoringAdjacency
+                    | ToolType::FlipDraftedDie
+                    | ToolType::RerollDraftedDie => {
+                        self.players[self.curr_player_idx].active_tool = Some(tool.tool_type);
+                    }
+                    _ => todo!("Implement tool: {t:?}", t = tool.tool_type),
+                }
+                self.players[self.curr_player_idx].tokens -= tool.cost;
                 if tool.cost == 1 {
                     self.tools[idx].cost = 2;
                 }
-                Ok(())
+                Ok(false)
             }
         }
     }
@@ -181,10 +200,11 @@ impl GameState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Player {
-    pub tokens: u8,
-    pub board: [[BoardCell; BOARD_COLS]; BOARD_ROWS],
-    pub secret: Color,
+    tokens: u8,
+    board: [[BoardCell; BOARD_COLS]; BOARD_ROWS],
+    secret: Color,
     pub templates: Vec<BoardTemplate>,
+    active_tool: Option<ToolType>,
 }
 impl Player {
     fn select_template(&mut self, idx: usize) -> Result<(), DynError> {
@@ -225,7 +245,8 @@ impl Player {
         }
         // Check diagonally adjacent cells if we don't have any orthogonally adjacent dice.
         if nbr_dice.is_empty()
-            && diagonal_coords(coords).any(|(r, c)| self.board[r][c].die.is_some())
+            && !matches!(self.active_tool, Some(ToolType::PlaceIgnoringAdjacency))
+            && !diagonal_coords(coords).any(|(r, c)| self.board[r][c].die.is_some())
         {
             if self.board.iter().flatten().any(|cell| cell.die.is_some()) {
                 return Err("Die must be placed adjacent to another die".into());
@@ -236,20 +257,21 @@ impl Player {
         }
         Ok(())
     }
-    fn place_die(&mut self, coords: (usize, usize), die: Dice) -> Result<(), DynError> {
+    fn place_die(&mut self, coords: (usize, usize), mut die: Dice) -> Result<(), DynError> {
+        match self.active_tool {
+            Some(ToolType::FlipDraftedDie) => die.flip(),
+            Some(ToolType::RerollDraftedDie) => die.reroll(&mut rand::thread_rng()),
+            _ => {}
+        }
         self.can_place_die(coords, die)?;
         self.board[coords.0][coords.1].die = Some(die);
         Ok(())
     }
-    fn can_use_tool(&self, tool: &Tool) -> Result<(), DynError> {
+    pub fn can_use_tool(&self, tool: &Tool) -> Result<(), DynError> {
         if tool.cost > self.tokens {
             return Err("Insufficient tokens to use tool".into());
         }
         Ok(())
-    }
-    fn use_tool(&mut self, tool: &Tool, _coords: Option<(usize, usize)>) -> Result<(), DynError> {
-        self.can_use_tool(tool)?;
-        todo!("Implement tool usage")
     }
     fn calculate_score(&self, objectives: &[Objective]) -> i32 {
         // One point for each die matching our secret color, and minus one
