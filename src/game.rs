@@ -16,11 +16,12 @@ pub struct GameState {
     start_player_idx: usize,
     pub curr_player_idx: usize,
     pub phase: TurnPhase,
+    #[serde(skip)]
     dice_bag: Vec<Color>,
     pub draft_pool: Vec<Dice>,
     pub round_track: Vec<Vec<Dice>>,
     pub tools: Vec<Tool>,
-    objectives: Vec<Objective>,
+    pub objectives: Vec<Objective>,
 }
 impl GameState {
     pub fn init(num_players: usize) -> Result<Self, DynError> {
