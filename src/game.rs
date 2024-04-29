@@ -14,7 +14,7 @@ type DynError = Box<dyn std::error::Error>;
 pub struct GameState {
     players: Vec<Player>,
     start_player_idx: usize,
-    curr_player_idx: usize,
+    pub curr_player_idx: usize,
     pub phase: TurnPhase,
     dice_bag: Vec<Color>,
     pub draft_pool: Vec<Dice>,
