@@ -12,7 +12,7 @@ type DynError = Box<dyn std::error::Error>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameState {
-    players: Vec<Player>,
+    pub players: Vec<Player>,
     start_player_idx: usize,
     pub curr_player_idx: usize,
     pub phase: TurnPhase,
@@ -239,6 +239,14 @@ impl GameState {
             .iter()
             .map(|player| player.calculate_score(&self.objectives))
             .collect()
+    }
+    pub fn redact_secrets(&mut self, exclude_idx: usize) {
+        let c = self.players[exclude_idx].secret;
+        for i in 0..self.players.len() {
+            if i != exclude_idx {
+                self.players[i].secret = c;
+            }
+        }
     }
 }
 
