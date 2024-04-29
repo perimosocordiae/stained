@@ -1,5 +1,6 @@
 use crate::constants::{BOARD_COLS, BOARD_ROWS};
 use crate::game::{GameState, Player};
+use crate::tool::{ToolData, ToolType};
 use crate::turn::{ActionType, TurnAction, TurnPhase};
 use rand::prelude::{IteratorRandom, SliceRandom};
 
@@ -21,7 +22,11 @@ impl Agent for RandomAgent {
             TurnPhase::SelectTemplate => {
                 let idx =
                     ActionType::SelectTemplate((0..me.templates.len()).choose(&mut rng).unwrap());
-                TurnAction { idx, coords: None }
+                TurnAction {
+                    idx,
+                    coords: None,
+                    tool: None,
+                }
             }
             TurnPhase::FirstDraft | TurnPhase::SecondDraft => {
                 if let Some(action) = all_valid_drafts(game, me).choose(&mut rng) {
@@ -46,6 +51,7 @@ fn all_valid_drafts(game: &GameState, player: &Player) -> Vec<TurnAction> {
                     valid_drafts.push(TurnAction {
                         idx: ActionType::DraftDie(idx),
                         coords: Some((row, col)),
+                        tool: None,
                     });
                 }
             }
@@ -55,14 +61,74 @@ fn all_valid_drafts(game: &GameState, player: &Player) -> Vec<TurnAction> {
 }
 
 fn all_valid_tools(game: &GameState, player: &Player) -> Vec<TurnAction> {
-    game.tools
+    let usable_tools = game
+        .tools
         .iter()
         .enumerate()
-        .filter_map(|(idx, tool)| {
-            player.can_use_tool(tool).ok().map(|_| TurnAction {
-                idx: ActionType::UseTool(idx),
-                coords: None,
-            })
+        .filter(|(_, tool)| player.can_use_tool(tool).is_ok());
+    usable_tools
+        .flat_map(|(idx, tool)| {
+            let mut options = Vec::new();
+            match tool.tool_type {
+                ToolType::FlipDraftedDie => {
+                    for i in 0..game.draft_pool.len() {
+                        options.push(TurnAction {
+                            idx: ActionType::UseTool(idx),
+                            coords: None,
+                            tool: Some(ToolData::FlipDraftedDie { draft_idx: i }),
+                        });
+                    }
+                }
+                ToolType::RerollDraftedDie => {
+                    for i in 0..game.draft_pool.len() {
+                        options.push(TurnAction {
+                            idx: ActionType::UseTool(idx),
+                            coords: None,
+                            tool: Some(ToolData::RerollDraftedDie { draft_idx: i }),
+                        });
+                    }
+                }
+                ToolType::BumpDraftedDie => {
+                    for (i, die) in game.draft_pool.iter().enumerate() {
+                        if die.face < 6 {
+                            options.push(TurnAction {
+                                idx: ActionType::UseTool(idx),
+                                coords: None,
+                                tool: Some(ToolData::BumpDraftedDie {
+                                    draft_idx: i,
+                                    is_increment: true,
+                                }),
+                            });
+                        }
+                        if die.face > 1 {
+                            options.push(TurnAction {
+                                idx: ActionType::UseTool(idx),
+                                coords: None,
+                                tool: Some(ToolData::BumpDraftedDie {
+                                    draft_idx: i,
+                                    is_increment: false,
+                                }),
+                            });
+                        }
+                    }
+                }
+                ToolType::RerollAllDiceInPool => {
+                    options.push(TurnAction {
+                        idx: ActionType::UseTool(idx),
+                        coords: None,
+                        tool: Some(ToolData::RerollAllDiceInPool),
+                    });
+                }
+                ToolType::PlaceIgnoringAdjacency => {
+                    options.push(TurnAction {
+                        idx: ActionType::UseTool(idx),
+                        coords: None,
+                        tool: Some(ToolData::PlaceIgnoringAdjacency),
+                    });
+                }
+                _ => todo!("Implement tool: {:?}", tool.tool_type),
+            }
+            options
         })
         .collect()
 }

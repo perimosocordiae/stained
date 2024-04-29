@@ -1,21 +1,9 @@
-use crate::turn::TurnPhase;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tool {
     pub tool_type: ToolType,
     pub cost: u8,
-}
-impl Tool {
-    pub fn in_wrong_phase(&self, phase: TurnPhase) -> bool {
-        matches!(
-            (phase, self.tool_type),
-            (TurnPhase::SelectTemplate, _)
-                | (TurnPhase::GameOver, _)
-                | (TurnPhase::FirstDraft, ToolType::RerollAllDiceInPool)
-                | (TurnPhase::SecondDraft, ToolType::DraftTwoDice)
-        )
-    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -37,8 +25,8 @@ pub enum ToolType {
     PlaceIgnoringAdjacency,
 }
 // TODO: Uncomment tools as they are implemented.
-pub const ALL_TOOL_TYPES: [ToolType; 4] = [
-    // ToolType::BumpDraftedDie,
+pub const ALL_TOOL_TYPES: [ToolType; 5] = [
+    ToolType::BumpDraftedDie,
     ToolType::FlipDraftedDie,
     ToolType::RerollDraftedDie,
     // ToolType::SwapDraftedDieWithRoundTrack,
@@ -51,3 +39,83 @@ pub const ALL_TOOL_TYPES: [ToolType; 4] = [
     // ToolType::DraftTwoDice,
     ToolType::PlaceIgnoringAdjacency,
 ];
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ToolData {
+    BumpDraftedDie {
+        draft_idx: usize,
+        is_increment: bool,
+    },
+    FlipDraftedDie {
+        draft_idx: usize,
+    },
+    RerollDraftedDie {
+        draft_idx: usize,
+    },
+    SwapDraftedDieWithRoundTrack {
+        draft_idx: usize,
+        round_idx: (usize, usize),
+    },
+    SwapDraftedDieWithBag {
+        draft_idx: usize,
+        face: u8,
+    },
+    RerollAllDiceInPool,
+    MoveDieIgnoringColor {
+        from: (usize, usize),
+    },
+    MoveDieIgnoringValue {
+        from: (usize, usize),
+    },
+    MoveExactlyTwoDice {
+        from: [(usize, usize); 2],
+        to: [(usize, usize); 2],
+    },
+    MoveUpToTwoDiceMatchingColor {
+        from: [(usize, usize); 2],
+        to: [(usize, usize); 2],
+        round_idx: (usize, usize),
+    },
+    DraftTwoDice,
+    PlaceIgnoringAdjacency,
+}
+impl ToolData {
+    pub fn matches_type(&self, tool_type: ToolType) -> bool {
+        matches!(
+            (self, tool_type),
+            (Self::BumpDraftedDie { .. }, ToolType::BumpDraftedDie)
+                | (Self::FlipDraftedDie { .. }, ToolType::FlipDraftedDie)
+                | (Self::RerollDraftedDie { .. }, ToolType::RerollDraftedDie)
+                | (
+                    Self::SwapDraftedDieWithRoundTrack { .. },
+                    ToolType::SwapDraftedDieWithRoundTrack
+                )
+                | (
+                    Self::SwapDraftedDieWithBag { .. },
+                    ToolType::SwapDraftedDieWithBag
+                )
+                | (Self::RerollAllDiceInPool, ToolType::RerollAllDiceInPool)
+                | (
+                    Self::MoveDieIgnoringColor { .. },
+                    ToolType::MoveDieIgnoringColor
+                )
+                | (
+                    Self::MoveDieIgnoringValue { .. },
+                    ToolType::MoveDieIgnoringValue
+                )
+                | (
+                    Self::MoveExactlyTwoDice { .. },
+                    ToolType::MoveExactlyTwoDice
+                )
+                | (
+                    Self::MoveUpToTwoDiceMatchingColor { .. },
+                    ToolType::MoveUpToTwoDiceMatchingColor
+                )
+                | (Self::DraftTwoDice, ToolType::DraftTwoDice)
+                | (
+                    Self::PlaceIgnoringAdjacency,
+                    ToolType::PlaceIgnoringAdjacency
+                )
+        )
+    }
+}

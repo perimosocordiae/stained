@@ -52,4 +52,10 @@ impl Dice {
     pub fn flip(&mut self) {
         self.face = 7 - self.face;
     }
+    pub fn increment(&mut self) {
+        self.face = self.face.saturating_add(1);
+    }
+    pub fn decrement(&mut self) {
+        self.face = self.face.saturating_sub(1);
+    }
 }

@@ -3,7 +3,7 @@ use crate::color::{Color, Dice, ALL_COLORS};
 use crate::constants::*;
 use crate::objective::{Objective, ALL_OBJECTIVES};
 use crate::template::{BoardTemplate, Slot, ALL_BOARD_TEMPLATES};
-use crate::tool::{Tool, ToolType, ALL_TOOL_TYPES};
+use crate::tool::{Tool, ToolData, ToolType, ALL_TOOL_TYPES};
 use crate::turn::{ActionType, TurnAction, TurnPhase};
 use rand::{prelude::SliceRandom, seq::IteratorRandom};
 use serde::{Deserialize, Serialize};
@@ -148,21 +148,38 @@ impl GameState {
             }
             ActionType::UseTool(idx) => {
                 let tool = self.tools.get(idx).ok_or("Invalid tool index")?;
-                if tool.in_wrong_phase(self.phase) {
-                    return Err("Cannot use this tool now".into());
-                }
-                self.current_player().can_use_tool(tool)?;
-                match tool.tool_type {
-                    ToolType::RerollAllDiceInPool => {
-                        let mut rng = rand::thread_rng();
+                let data = action.tool.as_ref().ok_or("Tool action missing data")?;
+                let mut rng = rand::thread_rng();
+                match data {
+                    ToolData::RerollAllDiceInPool => {
                         self.draft_pool
                             .iter_mut()
                             .for_each(|die| die.reroll(&mut rng));
                     }
-                    ToolType::PlaceIgnoringAdjacency
-                    | ToolType::FlipDraftedDie
-                    | ToolType::RerollDraftedDie => {
+                    ToolData::PlaceIgnoringAdjacency => {
                         self.players[self.curr_player_idx].active_tool = Some(tool.tool_type);
+                    }
+                    ToolData::FlipDraftedDie { draft_idx } => {
+                        self.draft_pool[*draft_idx].flip();
+                    }
+                    ToolData::RerollDraftedDie { draft_idx } => {
+                        self.draft_pool[*draft_idx].reroll(&mut rng);
+                    }
+                    ToolData::BumpDraftedDie {
+                        draft_idx,
+                        is_increment,
+                    } => {
+                        let face = self.draft_pool[*draft_idx].face;
+                        match (*is_increment, face) {
+                            (true, 6) => {
+                                return Err("Cannot increment a die past 6".into());
+                            }
+                            (false, 1) => {
+                                return Err("Cannot decrement a die below 1".into());
+                            }
+                            (true, _) => self.draft_pool[*draft_idx].increment(),
+                            (false, _) => self.draft_pool[*draft_idx].decrement(),
+                        }
                     }
                     _ => todo!("Implement tool: {t:?}", t = tool.tool_type),
                 }
