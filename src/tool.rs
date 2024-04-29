@@ -25,11 +25,11 @@ pub enum ToolType {
     PlaceIgnoringAdjacency,
 }
 // TODO: Uncomment tools as they are implemented.
-pub const ALL_TOOL_TYPES: [ToolType; 5] = [
+pub const ALL_TOOL_TYPES: [ToolType; 6] = [
     ToolType::BumpDraftedDie,
     ToolType::FlipDraftedDie,
     ToolType::RerollDraftedDie,
-    // ToolType::SwapDraftedDieWithRoundTrack,
+    ToolType::SwapDraftedDieWithRoundTrack,
     // ToolType::SwapDraftedDieWithBag,
     ToolType::RerollAllDiceInPool,
     // ToolType::MoveDieIgnoringColor,

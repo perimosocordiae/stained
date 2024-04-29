@@ -18,7 +18,7 @@ pub struct GameState {
     pub phase: TurnPhase,
     dice_bag: Vec<Color>,
     pub draft_pool: Vec<Dice>,
-    round_track: Vec<Vec<Dice>>,
+    pub round_track: Vec<Vec<Dice>>,
     pub tools: Vec<Tool>,
     objectives: Vec<Objective>,
 }
@@ -160,16 +160,26 @@ impl GameState {
                         self.players[self.curr_player_idx].active_tool = Some(tool.tool_type);
                     }
                     ToolData::FlipDraftedDie { draft_idx } => {
-                        self.draft_pool[*draft_idx].flip();
+                        self.draft_pool
+                            .get_mut(*draft_idx)
+                            .ok_or("Invalid draft index")?
+                            .flip();
                     }
                     ToolData::RerollDraftedDie { draft_idx } => {
-                        self.draft_pool[*draft_idx].reroll(&mut rng);
+                        self.draft_pool
+                            .get_mut(*draft_idx)
+                            .ok_or("Invalid draft index")?
+                            .reroll(&mut rng);
                     }
                     ToolData::BumpDraftedDie {
                         draft_idx,
                         is_increment,
                     } => {
-                        let face = self.draft_pool[*draft_idx].face;
+                        let face = self
+                            .draft_pool
+                            .get(*draft_idx)
+                            .ok_or("Invalid draft index")?
+                            .face;
                         match (*is_increment, face) {
                             (true, 6) => {
                                 return Err("Cannot increment a die past 6".into());
@@ -180,6 +190,22 @@ impl GameState {
                             (true, _) => self.draft_pool[*draft_idx].increment(),
                             (false, _) => self.draft_pool[*draft_idx].decrement(),
                         }
+                    }
+                    ToolData::SwapDraftedDieWithRoundTrack {
+                        draft_idx,
+                        round_idx,
+                    } => {
+                        let src = self
+                            .round_track
+                            .get_mut(round_idx.0)
+                            .ok_or("Invalid round index")?
+                            .get_mut(round_idx.1)
+                            .ok_or("Invalid die index")?;
+                        let dst = self
+                            .draft_pool
+                            .get_mut(*draft_idx)
+                            .ok_or("Invalid draft pool index")?;
+                        std::mem::swap(src, dst);
                     }
                     _ => todo!("Implement tool: {t:?}", t = tool.tool_type),
                 }

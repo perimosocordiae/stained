@@ -71,31 +71,31 @@ fn all_valid_tools(game: &GameState, player: &Player) -> Vec<TurnAction> {
             let mut options = Vec::new();
             match tool.tool_type {
                 ToolType::FlipDraftedDie => {
-                    for i in 0..game.draft_pool.len() {
+                    for draft_idx in 0..game.draft_pool.len() {
                         options.push(TurnAction {
                             idx: ActionType::UseTool(idx),
                             coords: None,
-                            tool: Some(ToolData::FlipDraftedDie { draft_idx: i }),
+                            tool: Some(ToolData::FlipDraftedDie { draft_idx }),
                         });
                     }
                 }
                 ToolType::RerollDraftedDie => {
-                    for i in 0..game.draft_pool.len() {
+                    for draft_idx in 0..game.draft_pool.len() {
                         options.push(TurnAction {
                             idx: ActionType::UseTool(idx),
                             coords: None,
-                            tool: Some(ToolData::RerollDraftedDie { draft_idx: i }),
+                            tool: Some(ToolData::RerollDraftedDie { draft_idx }),
                         });
                     }
                 }
                 ToolType::BumpDraftedDie => {
-                    for (i, die) in game.draft_pool.iter().enumerate() {
+                    for (draft_idx, die) in game.draft_pool.iter().enumerate() {
                         if die.face < 6 {
                             options.push(TurnAction {
                                 idx: ActionType::UseTool(idx),
                                 coords: None,
                                 tool: Some(ToolData::BumpDraftedDie {
-                                    draft_idx: i,
+                                    draft_idx,
                                     is_increment: true,
                                 }),
                             });
@@ -105,7 +105,7 @@ fn all_valid_tools(game: &GameState, player: &Player) -> Vec<TurnAction> {
                                 idx: ActionType::UseTool(idx),
                                 coords: None,
                                 tool: Some(ToolData::BumpDraftedDie {
-                                    draft_idx: i,
+                                    draft_idx,
                                     is_increment: false,
                                 }),
                             });
@@ -125,6 +125,22 @@ fn all_valid_tools(game: &GameState, player: &Player) -> Vec<TurnAction> {
                         coords: None,
                         tool: Some(ToolData::PlaceIgnoringAdjacency),
                     });
+                }
+                ToolType::SwapDraftedDieWithRoundTrack => {
+                    for draft_idx in 0..game.draft_pool.len() {
+                        for (i, round_dice) in game.round_track.iter().enumerate() {
+                            for j in 0..round_dice.len() {
+                                options.push(TurnAction {
+                                    idx: ActionType::UseTool(idx),
+                                    coords: None,
+                                    tool: Some(ToolData::SwapDraftedDieWithRoundTrack {
+                                        draft_idx,
+                                        round_idx: (i, j),
+                                    }),
+                                });
+                            }
+                        }
+                    }
                 }
                 _ => todo!("Implement tool: {:?}", tool.tool_type),
             }
