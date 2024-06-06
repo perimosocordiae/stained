@@ -39,6 +39,9 @@ impl GameState {
         let player_templates: Vec<_> = ALL_BOARD_TEMPLATES
             .choose_multiple(&mut rng, num_players * 2)
             .collect();
+        if player_templates.len() != num_players * 2 {
+            return Err("Not enough templates for this many players".into());
+        }
         let players = ALL_COLORS
             .choose_multiple(&mut rng, num_players)
             .zip(player_templates.as_slice().chunks(2))
@@ -140,9 +143,9 @@ impl GameState {
             }
             ActionType::DraftDie(idx) => {
                 if let Some(coords) = action.coords {
-                    self.draft_pool.get(idx).ok_or("Invalid die index")?;
-                    let die = self.draft_pool.remove(idx);
-                    self.players[self.curr_player_idx].place_die(coords, die)?;
+                    let die = self.draft_pool.get(idx).ok_or("Invalid die index")?;
+                    self.players[self.curr_player_idx].place_die(coords, *die)?;
+                    self.draft_pool.remove(idx);
                 }
                 self.players[self.curr_player_idx].active_tool = None;
                 Ok(true)
@@ -150,6 +153,7 @@ impl GameState {
             ActionType::UseTool(idx) => {
                 let tool = self.tools.get(idx).ok_or("Invalid tool index")?;
                 let data = action.tool.as_ref().ok_or("Tool action missing data")?;
+                self.players[self.curr_player_idx].can_use_tool(tool)?;
                 let mut rng = rand::thread_rng();
                 match data {
                     ToolData::RerollAllDiceInPool => {
