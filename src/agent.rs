@@ -2,7 +2,7 @@ use crate::constants::{BOARD_COLS, BOARD_ROWS};
 use crate::game::{GameState, Player};
 use crate::tool::{ToolData, ToolType};
 use crate::turn::{ActionType, TurnAction, TurnPhase};
-use rand::prelude::{IteratorRandom, SliceRandom};
+use rand::seq::{IndexedRandom, IteratorRandom};
 
 pub trait Agent {
     fn choose_action(&self, game: &GameState) -> TurnAction;
@@ -16,7 +16,7 @@ pub fn create_agent(_difficulty: usize) -> Box<dyn Agent + Send> {
 struct RandomAgent;
 impl Agent for RandomAgent {
     fn choose_action(&self, game: &GameState) -> TurnAction {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let me = game.current_player();
         match game.phase {
             TurnPhase::SelectTemplate => {

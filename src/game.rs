@@ -1,11 +1,12 @@
 use crate::board::BoardCell;
-use crate::color::{Color, Dice, ALL_COLORS};
+use crate::color::{ALL_COLORS, Color, Dice};
 use crate::constants::*;
-use crate::objective::{Objective, ALL_OBJECTIVES};
-use crate::template::{BoardTemplate, Slot, ALL_BOARD_TEMPLATES};
-use crate::tool::{Tool, ToolData, ToolType, ALL_TOOL_TYPES};
+use crate::objective::{ALL_OBJECTIVES, Objective};
+use crate::template::{ALL_BOARD_TEMPLATES, BoardTemplate, Slot};
+use crate::tool::{ALL_TOOL_TYPES, Tool, ToolData, ToolType};
 use crate::turn::{ActionType, TurnAction, TurnPhase};
-use rand::{prelude::SliceRandom, seq::IteratorRandom};
+use rand::prelude::SliceRandom;
+use rand::seq::{IndexedRandom, IteratorRandom};
 use serde::{Deserialize, Serialize};
 
 type DynError = Box<dyn std::error::Error>;
@@ -32,7 +33,7 @@ impl GameState {
         for _ in 0..DICE_PER_COLOR {
             dice_bag.extend_from_slice(ALL_COLORS.as_slice());
         }
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         dice_bag.shuffle(&mut rng);
 
         let start_player_idx = (0..num_players).choose(&mut rng).unwrap_or(0);
@@ -154,7 +155,7 @@ impl GameState {
                 let tool = self.tools.get(idx).ok_or("Invalid tool index")?;
                 let data = action.tool.as_ref().ok_or("Tool action missing data")?;
                 self.players[self.curr_player_idx].can_use_tool(tool)?;
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 match data {
                     ToolData::RerollAllDiceInPool => {
                         self.draft_pool
@@ -223,7 +224,7 @@ impl GameState {
         }
     }
     fn start_round(&mut self) {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         self.draft_pool = self
             .dice_bag
             .split_off(self.dice_bag.len() - self.pool_size())
@@ -316,7 +317,7 @@ impl Player {
     fn place_die(&mut self, coords: (usize, usize), mut die: Dice) -> Result<(), DynError> {
         match self.active_tool {
             Some(ToolType::FlipDraftedDie) => die.flip(),
-            Some(ToolType::RerollDraftedDie) => die.reroll(&mut rand::thread_rng()),
+            Some(ToolType::RerollDraftedDie) => die.reroll(&mut rand::rng()),
             _ => {}
         }
         self.can_place_die(coords, die)?;

@@ -1,5 +1,5 @@
 use crate::board::BoardCell;
-use crate::color::{Color, Dice, ALL_COLORS};
+use crate::color::{ALL_COLORS, Color, Dice};
 use crate::constants::{BOARD_COLS, BOARD_ROWS, NUM_COLORS};
 use serde::{Deserialize, Serialize};
 
