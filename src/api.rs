@@ -1,4 +1,4 @@
-use blau_api::{GameAPI, PlayerInfo, Result};
+use blau_api::{DynSafeGameAPI, GameAPI, PlayerInfo, Result};
 use serde::Serialize;
 
 use crate::{
@@ -101,28 +101,6 @@ impl GameAPI for StainedAPI {
         })
     }
 
-    fn is_game_over(&self) -> bool {
-        self.game_over
-    }
-
-    fn final_state(&self) -> Result<String> {
-        if !self.game_over {
-            return Err("Game is not finished".into());
-        }
-        Ok(serde_json::to_string(&self.state)?)
-    }
-
-    fn player_view(&self, player_id: &str) -> Result<String> {
-        let player_idx = self
-            .player_ids
-            .iter()
-            .position(|id| id == player_id)
-            .ok_or("Unknown player ID")?;
-        let mut game = self.state.clone();
-        game.redact_secrets(player_idx);
-        Ok(serde_json::to_string(&game)?)
-    }
-
     fn start<F: FnMut(&str, &str)>(&mut self, game_id: i64, mut notice_cb: F) -> Result<()> {
         let msg = format!(r#"{{"action": "start", "game_id": {game_id}}}"#);
         for idx in self.human_player_idxs() {
@@ -146,6 +124,30 @@ impl GameAPI for StainedAPI {
         // Advance to wait for the next player action.
         self.process_agents(&mut notice_cb)?;
         Ok(())
+    }
+}
+
+impl DynSafeGameAPI for StainedAPI {
+    fn is_game_over(&self) -> bool {
+        self.game_over
+    }
+
+    fn final_state(&self) -> Result<String> {
+        if !self.game_over {
+            return Err("Game is not finished".into());
+        }
+        Ok(serde_json::to_string(&self.state)?)
+    }
+
+    fn player_view(&self, player_id: &str) -> Result<String> {
+        let player_idx = self
+            .player_ids
+            .iter()
+            .position(|id| id == player_id)
+            .ok_or("Unknown player ID")?;
+        let mut game = self.state.clone();
+        game.redact_secrets(player_idx);
+        Ok(serde_json::to_string(&game)?)
     }
 
     fn current_player_id(&self) -> &str {
