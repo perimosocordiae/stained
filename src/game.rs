@@ -291,6 +291,7 @@ impl Player {
                 self.board[i][j].slot = template.slots[i][j];
             }
         }
+        self.templates.clear();
         Ok(())
     }
     pub fn can_place_die(
