@@ -50,7 +50,10 @@ impl GameState {
                 tokens: 0,
                 board: [[BoardCell::default(); BOARD_COLS]; BOARD_ROWS],
                 secret: *secret,
-                templates: templates.iter().flat_map(|x| x.iter().cloned()).collect(),
+                templates: templates
+                    .iter()
+                    .flat_map(|x| x.iter().cloned())
+                    .collect(),
                 active_tool: None,
             })
             .collect();
@@ -114,7 +117,8 @@ impl GameState {
                 if self.handle_action(action)? {
                     self.curr_player_idx = self.next_idx(self.curr_player_idx);
                     if self.curr_player_idx == self.start_player_idx {
-                        self.curr_player_idx = self.prev_idx(self.curr_player_idx);
+                        self.curr_player_idx =
+                            self.prev_idx(self.curr_player_idx);
                         self.phase = TurnPhase::SecondDraft;
                     }
                 }
@@ -129,7 +133,8 @@ impl GameState {
                             self.start_round();
                         }
                     } else {
-                        self.curr_player_idx = self.prev_idx(self.curr_player_idx);
+                        self.curr_player_idx =
+                            self.prev_idx(self.curr_player_idx);
                     }
                 }
             }
@@ -140,12 +145,15 @@ impl GameState {
     fn handle_action(&mut self, action: &TurnAction) -> Result<bool, DynError> {
         match action.idx {
             ActionType::SelectTemplate(_) => {
-                Err("Invalid action: templates have already been selected".into())
+                Err("Invalid action: templates have already been selected"
+                    .into())
             }
             ActionType::DraftDie(idx) => {
                 if let Some(coords) = action.coords {
-                    let die = self.draft_pool.get(idx).ok_or("Invalid die index")?;
-                    self.players[self.curr_player_idx].place_die(coords, *die)?;
+                    let die =
+                        self.draft_pool.get(idx).ok_or("Invalid die index")?;
+                    self.players[self.curr_player_idx]
+                        .place_die(coords, *die)?;
                     self.draft_pool.remove(idx);
                 }
                 self.players[self.curr_player_idx].active_tool = None;
@@ -153,7 +161,8 @@ impl GameState {
             }
             ActionType::UseTool(idx) => {
                 let tool = self.tools.get(idx).ok_or("Invalid tool index")?;
-                let data = action.tool.as_ref().ok_or("Tool action missing data")?;
+                let data =
+                    action.tool.as_ref().ok_or("Tool action missing data")?;
                 self.players[self.curr_player_idx].can_use_tool(tool)?;
                 let mut rng = rand::rng();
                 match data {
@@ -163,7 +172,8 @@ impl GameState {
                             .for_each(|die| die.reroll(&mut rng));
                     }
                     ToolData::PlaceIgnoringAdjacency => {
-                        self.players[self.curr_player_idx].active_tool = Some(tool.tool_type);
+                        self.players[self.curr_player_idx].active_tool =
+                            Some(tool.tool_type);
                     }
                     ToolData::FlipDraftedDie { draft_idx } => {
                         self.draft_pool
@@ -188,13 +198,21 @@ impl GameState {
                             .face;
                         match (*is_increment, face) {
                             (true, 6) => {
-                                return Err("Cannot increment a die past 6".into());
+                                return Err(
+                                    "Cannot increment a die past 6".into()
+                                );
                             }
                             (false, 1) => {
-                                return Err("Cannot decrement a die below 1".into());
+                                return Err(
+                                    "Cannot decrement a die below 1".into()
+                                );
                             }
-                            (true, _) => self.draft_pool[*draft_idx].increment(),
-                            (false, _) => self.draft_pool[*draft_idx].decrement(),
+                            (true, _) => {
+                                self.draft_pool[*draft_idx].increment()
+                            }
+                            (false, _) => {
+                                self.draft_pool[*draft_idx].decrement()
+                            }
                         }
                     }
                     ToolData::SwapDraftedDieWithRoundTrack {
@@ -265,7 +283,8 @@ pub struct Player {
 }
 impl Player {
     fn select_template(&mut self, idx: usize) -> Result<(), DynError> {
-        let template = self.templates.get(idx).ok_or("Invalid template index")?;
+        let template =
+            self.templates.get(idx).ok_or("Invalid template index")?;
         self.tokens = template.value;
         for i in 0..BOARD_ROWS {
             for j in 0..BOARD_COLS {
@@ -274,7 +293,11 @@ impl Player {
         }
         Ok(())
     }
-    pub fn can_place_die(&self, coords: (usize, usize), die: Dice) -> Result<(), DynError> {
+    pub fn can_place_die(
+        &self,
+        coords: (usize, usize),
+        die: Dice,
+    ) -> Result<(), DynError> {
         let row = self.board.get(coords.0).ok_or("Invalid row")?;
         let cell = row.get(coords.1).ok_or("Invalid column")?;
         if cell.die.is_some() {
@@ -295,26 +318,38 @@ impl Player {
             .collect();
         for ndr_die in nbr_dice.iter() {
             if die.color == ndr_die.color {
-                return Err("Die color matches orthogonally adjacent die".into());
+                return Err(
+                    "Die color matches orthogonally adjacent die".into()
+                );
             } else if die.face == ndr_die.face {
                 return Err("Die face matches orthogonally adjacent die".into());
             }
         }
         // Check diagonally adjacent cells if we don't have any orthogonally adjacent dice.
         if nbr_dice.is_empty()
-            && !matches!(self.active_tool, Some(ToolType::PlaceIgnoringAdjacency))
-            && !diagonal_coords(coords).any(|(r, c)| self.board[r][c].die.is_some())
+            && !matches!(
+                self.active_tool,
+                Some(ToolType::PlaceIgnoringAdjacency)
+            )
+            && !diagonal_coords(coords)
+                .any(|(r, c)| self.board[r][c].die.is_some())
         {
             if self.board.iter().flatten().any(|cell| cell.die.is_some()) {
                 return Err("Die must be placed adjacent to another die".into());
             }
-            if (1..BOARD_ROWS - 1).contains(&coords.0) && (1..BOARD_COLS - 1).contains(&coords.1) {
+            if (1..BOARD_ROWS - 1).contains(&coords.0)
+                && (1..BOARD_COLS - 1).contains(&coords.1)
+            {
                 return Err("First die must be placed on the edge".into());
             }
         }
         Ok(())
     }
-    fn place_die(&mut self, coords: (usize, usize), mut die: Dice) -> Result<(), DynError> {
+    fn place_die(
+        &mut self,
+        coords: (usize, usize),
+        mut die: Dice,
+    ) -> Result<(), DynError> {
         match self.active_tool {
             Some(ToolType::FlipDraftedDie) => die.flip(),
             Some(ToolType::RerollDraftedDie) => die.reroll(&mut rand::rng()),
@@ -353,7 +388,9 @@ impl Player {
     }
 }
 
-fn neighbor_coords(coords: (usize, usize)) -> impl Iterator<Item = (usize, usize)> {
+fn neighbor_coords(
+    coords: (usize, usize),
+) -> impl Iterator<Item = (usize, usize)> {
     let (r, c) = coords;
     [
         (r, c.wrapping_sub(1)),
@@ -365,7 +402,9 @@ fn neighbor_coords(coords: (usize, usize)) -> impl Iterator<Item = (usize, usize
     .filter(|(r, c)| *r < BOARD_ROWS && *c < BOARD_COLS)
 }
 
-fn diagonal_coords(coords: (usize, usize)) -> impl Iterator<Item = (usize, usize)> {
+fn diagonal_coords(
+    coords: (usize, usize),
+) -> impl Iterator<Item = (usize, usize)> {
     let (r, c) = coords;
     [
         (r.wrapping_sub(1), c.wrapping_sub(1)),

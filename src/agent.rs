@@ -20,8 +20,9 @@ impl Agent for RandomAgent {
         let me = game.current_player();
         match game.phase {
             TurnPhase::SelectTemplate => {
-                let idx =
-                    ActionType::SelectTemplate((0..me.templates.len()).choose(&mut rng).unwrap());
+                let idx = ActionType::SelectTemplate(
+                    (0..me.templates.len()).choose(&mut rng).unwrap(),
+                );
                 TurnAction {
                     idx,
                     coords: None,
@@ -29,9 +30,13 @@ impl Agent for RandomAgent {
                 }
             }
             TurnPhase::FirstDraft | TurnPhase::SecondDraft => {
-                if let Some(action) = all_valid_drafts(game, me).choose(&mut rng) {
+                if let Some(action) =
+                    all_valid_drafts(game, me).choose(&mut rng)
+                {
                     action.clone()
-                } else if let Some(action) = all_valid_tools(game, me).choose(&mut rng) {
+                } else if let Some(action) =
+                    all_valid_tools(game, me).choose(&mut rng)
+                {
                     action.clone()
                 } else {
                     TurnAction::pass()

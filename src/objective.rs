@@ -35,7 +35,9 @@ impl Objective {
         match self {
             Objective::ColumnNumbers(n) => {
                 n * (0..BOARD_COLS)
-                    .filter(|c| distinct_numbers(board.iter().map(|row| &row[*c])))
+                    .filter(|c| {
+                        distinct_numbers(board.iter().map(|row| &row[*c]))
+                    })
                     .count() as i32
             }
             Objective::RowNumbers(n) => {
@@ -44,10 +46,14 @@ impl Objective {
                     .filter(|row| distinct_numbers(row.iter()))
                     .count() as i32
             }
-            Objective::Numbers(n) => n * (1..=6).map(|i| count_number(board, i)).min().unwrap_or(0),
+            Objective::Numbers(n) => {
+                n * (1..=6).map(|i| count_number(board, i)).min().unwrap_or(0)
+            }
             Objective::ColumnColors(n) => {
                 n * (0..BOARD_COLS)
-                    .filter(|c| distinct_colors(board.iter().map(|row| &row[*c])))
+                    .filter(|c| {
+                        distinct_colors(board.iter().map(|row| &row[*c]))
+                    })
                     .count() as i32
             }
             Objective::RowColors(n) => {
@@ -63,9 +69,15 @@ impl Objective {
                     .min()
                     .unwrap_or(0)
             }
-            Objective::Pair12(n) => n * count_number(board, 1).min(count_number(board, 2)),
-            Objective::Pair34(n) => n * count_number(board, 3).min(count_number(board, 4)),
-            Objective::Pair56(n) => n * count_number(board, 5).min(count_number(board, 6)),
+            Objective::Pair12(n) => {
+                n * count_number(board, 1).min(count_number(board, 2))
+            }
+            Objective::Pair34(n) => {
+                n * count_number(board, 3).min(count_number(board, 4))
+            }
+            Objective::Pair56(n) => {
+                n * count_number(board, 5).min(count_number(board, 6))
+            }
             Objective::ColorDiagonals(n) => n * color_diagonals(board),
         }
     }
@@ -113,7 +125,9 @@ fn count_color(board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS], c: Color) -> i32 {
     board
         .iter()
         .flatten()
-        .filter(|cell| matches!(cell.die, Some(Dice { color, .. }) if color == c))
+        .filter(
+            |cell| matches!(cell.die, Some(Dice { color, .. }) if color == c),
+        )
         .count() as i32
 }
 
@@ -136,5 +150,6 @@ fn color_diagonals(board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS]) -> i32 {
 
 fn has_diag(row: &[BoardCell], j: usize, color: Color) -> bool {
     (j > 0 && matches!(row[j - 1].die, Some(d) if d.color == color))
-        || (j < BOARD_COLS - 1 && matches!(row[j + 1].die, Some(d) if d.color == color))
+        || (j < BOARD_COLS - 1
+            && matches!(row[j + 1].die, Some(d) if d.color == color))
 }
