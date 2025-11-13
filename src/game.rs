@@ -97,10 +97,10 @@ impl GameState {
         &self.players[self.curr_player_idx]
     }
     pub fn take_turn(&mut self, action: &TurnAction) -> Result<bool, DynError> {
-        println!(
-            "{:?} (P{}) => {:?}",
-            self.phase, self.curr_player_idx, action
-        );
+        // println!(
+        //     "{:?} (P{}) => {:?}",
+        //     self.phase, self.curr_player_idx, action
+        // );
         match self.phase {
             TurnPhase::SelectTemplate => {
                 if let ActionType::SelectTemplate(idx) = action.idx {
@@ -263,6 +263,24 @@ impl GameState {
             .map(|player| player.calculate_score(&self.objectives))
             .collect()
     }
+    pub fn winner_idx(&self) -> Option<usize> {
+        if !self.is_finished() {
+            return None;
+        }
+        let scores: Vec<i32> = self
+            .players
+            .iter()
+            .map(|player| player.calculate_score(&self.objectives).total())
+            .collect();
+        let max_score = *scores.iter().max().unwrap();
+        let max_indices: Vec<usize> = scores
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &s)| if s == max_score { Some(i) } else { None })
+            .collect();
+        // TODO: Handle ties properly
+        max_indices.first().copied()
+    }
     pub fn redact_secrets(&mut self, exclude_idx: usize) {
         let c = self.players[exclude_idx].secret;
         for i in 0..self.players.len() {
@@ -394,10 +412,10 @@ impl Player {
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 pub struct ScoreBreakdown {
-    objectives: [i32; NUM_OBJECTIVES],
-    secret_color: i32,
-    unused_tokens: i32,
-    empty_slots: i32,
+    pub objectives: [i32; NUM_OBJECTIVES],
+    pub secret_color: i32,
+    pub unused_tokens: i32,
+    pub empty_slots: i32,
 }
 impl ScoreBreakdown {
     pub fn total(&self) -> i32 {
