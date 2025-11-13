@@ -257,7 +257,7 @@ impl GameState {
         self.start_player_idx = self.next_idx(self.start_player_idx);
         self.curr_player_idx = self.start_player_idx;
     }
-    pub fn player_scores(&self) -> Vec<i32> {
+    pub fn player_scores(&self) -> Vec<ScoreBreakdown> {
         self.players
             .iter()
             .map(|player| player.calculate_score(&self.objectives))
@@ -366,26 +366,45 @@ impl Player {
         }
         Ok(())
     }
-    fn calculate_score(&self, objectives: &[Objective]) -> i32 {
-        // One point for each die matching our secret color, and minus one
-        // point for each slot without a die in it.
-        let mut score = self
-            .board
-            .iter()
-            .flatten()
-            .map(|cell| match cell.die {
-                Some(die) if die.color == self.secret => 1,
-                None => -1,
-                _ => 0,
-            })
-            .sum::<i32>();
-        // Add one point per token.
-        score += self.tokens as i32;
-        // Add the scores for the objectives.
-        for obj in objectives.iter() {
-            score += obj.score(&self.board);
+    fn calculate_score(&self, objectives: &[Objective]) -> ScoreBreakdown {
+        let mut score = ScoreBreakdown::default();
+        // Score the objectives.
+        for (i, obj) in objectives.iter().enumerate() {
+            score.objectives[i] = obj.score(&self.board);
         }
+        for cell in self.board.iter().flatten() {
+            match cell.die {
+                // One point for each die matching our secret color
+                Some(die) => {
+                    if die.color == self.secret {
+                        score.secret_color += 1;
+                    }
+                }
+                // Minus one point for each slot without a die in it
+                None => {
+                    score.empty_slots -= 1;
+                }
+            }
+        }
+        // One point per unused token.
+        score.unused_tokens = self.tokens as i32;
         score
+    }
+}
+
+#[derive(Serialize, Deserialize, Default, Debug)]
+pub struct ScoreBreakdown {
+    objectives: [i32; NUM_OBJECTIVES],
+    secret_color: i32,
+    unused_tokens: i32,
+    empty_slots: i32,
+}
+impl ScoreBreakdown {
+    pub fn total(&self) -> i32 {
+        self.objectives.iter().sum::<i32>()
+            + self.secret_color
+            + self.unused_tokens
+            + self.empty_slots
     }
 }
 

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     agent::{Agent, create_agent},
-    game::GameState,
+    game::{GameState, ScoreBreakdown},
     turn::TurnAction,
 };
 
@@ -18,7 +18,7 @@ struct PlayerView<'a> {
 #[derive(Serialize, Deserialize)]
 struct FinalState {
     game: GameState,
-    scores: Vec<i32>,
+    scores: Vec<ScoreBreakdown>,
 }
 
 pub struct StainedAPI {
@@ -37,15 +37,18 @@ impl StainedAPI {
         let mut game = self.state.clone();
         let winner_id = if self.game_over {
             let scores = game.player_scores();
-            let max_score = *scores.iter().max().unwrap();
-            let max_indices: Vec<usize> =
-                scores
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(idx, &score)| {
-                        if score == max_score { Some(idx) } else { None }
-                    })
-                    .collect();
+            let max_score = scores.iter().map(|s| s.total()).max().unwrap();
+            let max_indices: Vec<usize> = scores
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, score)| {
+                    if score.total() == max_score {
+                        Some(idx)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
             // TODO: Handle ties properly
             Some(self.player_ids[max_indices[0]].as_str())
         } else {
@@ -171,7 +174,11 @@ impl DynSafeGameAPI for StainedAPI {
     }
 
     fn player_scores(&self) -> Vec<i32> {
-        self.state.player_scores()
+        self.state
+            .player_scores()
+            .into_iter()
+            .map(|s| s.total())
+            .collect()
     }
 }
 
