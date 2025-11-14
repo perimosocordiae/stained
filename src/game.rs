@@ -167,10 +167,7 @@ impl GameState {
                             .iter_mut()
                             .for_each(|die| die.reroll(&mut rng));
                     }
-                    ToolData::PlaceIgnoringAdjacency => {
-                        self.players[self.curr_player_idx].active_tool =
-                            Some(tool.tool_type);
-                    }
+                    ToolData::PlaceIgnoringAdjacency => {}
                     ToolData::FlipDraftedDie { draft_idx } => {
                         self.draft_pool
                             .get_mut(*draft_idx)
@@ -229,6 +226,8 @@ impl GameState {
                     }
                     _ => todo!("Implement tool: {t:?}", t = tool.tool_type),
                 }
+                self.players[self.curr_player_idx].active_tool =
+                    Some(tool.tool_type);
                 self.players[self.curr_player_idx].tokens -= tool.cost;
                 if tool.cost == 1 {
                     self.tools[idx].cost = 2;
@@ -363,18 +362,16 @@ impl Player {
     fn place_die(
         &mut self,
         coords: (usize, usize),
-        mut die: Dice,
+        die: Dice,
     ) -> Result<(), DynError> {
-        match self.active_tool {
-            Some(ToolType::FlipDraftedDie) => die.flip(),
-            Some(ToolType::RerollDraftedDie) => die.reroll(&mut rand::rng()),
-            _ => {}
-        }
         self.can_place_die(coords, die)?;
         self.board[coords.0][coords.1].die = Some(die);
         Ok(())
     }
     pub fn can_use_tool(&self, tool: &Tool) -> Result<(), DynError> {
+        if self.active_tool.is_some() {
+            return Err("Already used a tool this turn".into());
+        }
         if tool.cost > self.tokens {
             return Err("Insufficient tokens to use tool".into());
         }
