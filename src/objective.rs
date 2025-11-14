@@ -132,24 +132,105 @@ fn count_color(board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS], c: Color) -> i32 {
 }
 
 fn color_diagonals(board: &[[BoardCell; BOARD_COLS]; BOARD_ROWS]) -> i32 {
-    (0..BOARD_ROWS)
-        .zip(0..BOARD_COLS)
-        .filter_map(|(i, j)| {
-            let d = board[i][j].die?;
-            // Check if any diagonal is the same color as d.color
-            if (i > 0 && has_diag(&board[i - 1], j, d.color))
-                || (i < BOARD_ROWS - 1 && has_diag(&board[i + 1], j, d.color))
+    let mut count = 0;
+    for i in 0..BOARD_ROWS {
+        for j in 0..BOARD_COLS {
+            if let Some(d) = board[i][j].die
+                && (
+                    // Check upper-left and upper-right
+                    (i > 0 && has_diag(&board[i - 1], j, d.color)) ||
+                    // Check lower-left and lower-right
+                    (i < BOARD_ROWS - 1 && has_diag(&board[i + 1], j, d.color))
+                )
             {
-                Some(())
-            } else {
-                None
+                count += 1;
             }
-        })
-        .count() as i32
+        }
+    }
+    count
 }
 
 fn has_diag(row: &[BoardCell], j: usize, color: Color) -> bool {
     (j > 0 && matches!(row[j - 1].die, Some(d) if d.color == color))
         || (j < BOARD_COLS - 1
             && matches!(row[j + 1].die, Some(d) if d.color == color))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_has_diag() {
+        let empty = BoardCell::default();
+        let red = BoardCell::with_die(Dice {
+            color: Color::Red,
+            face: 3,
+        });
+        let blue = BoardCell::with_die(Dice {
+            color: Color::Blue,
+            face: 4,
+        });
+        let row = [empty.clone(), red, blue, empty.clone(), empty];
+
+        assert!(has_diag(&row, 0, Color::Red), "red @ 0 has diag");
+        assert!(!has_diag(&row, 0, Color::Blue), "blue @ 0 no diag");
+        assert!(!has_diag(&row, 1, Color::Red), "red @ 1 no diag");
+        assert!(has_diag(&row, 1, Color::Blue), "blue @ 1 has diag");
+        assert!(has_diag(&row, 2, Color::Red), "red @ 2 has diag");
+        assert!(!has_diag(&row, 2, Color::Blue), "blue @ 2 no diag");
+        assert!(!has_diag(&row, 3, Color::Red), "red @ 3 no diag");
+        assert!(has_diag(&row, 3, Color::Blue), "blue @ 3 has diag");
+    }
+
+    #[test]
+    fn test_color_diagonals() {
+        let empty = BoardCell::default();
+        let red = BoardCell::with_die(Dice {
+            color: Color::Red,
+            face: 3,
+        });
+        let blue = BoardCell::with_die(Dice {
+            color: Color::Blue,
+            face: 4,
+        });
+        // Board layout:
+        // . R . . .
+        // R . B . .
+        // . B . R .
+        // . . R . B
+        let board = [
+            [
+                empty.clone(),
+                red.clone(),
+                empty.clone(),
+                empty.clone(),
+                empty.clone(),
+            ],
+            [
+                red.clone(),
+                empty.clone(),
+                blue.clone(),
+                empty.clone(),
+                empty.clone(),
+            ],
+            [
+                empty.clone(),
+                blue.clone(),
+                empty.clone(),
+                red.clone(),
+                empty.clone(),
+            ],
+            [
+                empty.clone(),
+                empty.clone(),
+                red.clone(),
+                empty.clone(),
+                blue.clone(),
+            ],
+        ];
+
+        assert_eq!(color_diagonals(&board), 6);
+        assert_eq!(Objective::ColorDiagonals(2).score(&board), 12);
+    }
 }

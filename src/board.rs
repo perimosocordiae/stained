@@ -25,3 +25,11 @@ impl Display for BoardCell {
         }
     }
 }
+impl BoardCell {
+    pub fn with_die(die: Dice) -> Self {
+        Self {
+            slot: Slot::Any,
+            die: Some(die),
+        }
+    }
+}

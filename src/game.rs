@@ -97,10 +97,6 @@ impl GameState {
         &self.players[self.curr_player_idx]
     }
     pub fn take_turn(&mut self, action: &TurnAction) -> Result<bool, DynError> {
-        // println!(
-        //     "{:?} (P{}) => {:?}",
-        //     self.phase, self.curr_player_idx, action
-        // );
         match self.phase {
             TurnPhase::SelectTemplate => {
                 if let ActionType::SelectTemplate(idx) = action.idx {
@@ -392,10 +388,10 @@ impl Player {
         }
         for cell in self.board.iter().flatten() {
             match cell.die {
-                // One point for each die matching our secret color
+                // One point for each pip matching our secret color
                 Some(die) => {
                     if die.color == self.secret {
-                        score.secret_color += 1;
+                        score.secret_color += die.face as i32;
                     }
                 }
                 // Minus one point for each slot without a die in it
