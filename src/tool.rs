@@ -13,8 +13,8 @@ pub enum ToolType {
     FlipDraftedDie, // 1 <-> 6, 2 <-> 5, 3 <-> 4
     RerollDraftedDie,
     SwapDraftedDieWithRoundTrack,
-    SwapDraftedDieWithBag,
-    RerollAllDiceInPool, // only before second draft
+    SwapDraftedDieWithBag, // player chooses face after swapping
+    RerollAllDiceInPool,   // only before second draft
     // Tools that move dice already on the board.
     MoveDieIgnoringColor,
     MoveDieIgnoringValue,
@@ -25,12 +25,12 @@ pub enum ToolType {
     PlaceIgnoringAdjacency,
 }
 // TODO: Uncomment tools as they are implemented.
-pub const ALL_TOOL_TYPES: [ToolType; 6] = [
+pub const ALL_TOOL_TYPES: [ToolType; 7] = [
     ToolType::BumpDraftedDie,
     ToolType::FlipDraftedDie,
     ToolType::RerollDraftedDie,
     ToolType::SwapDraftedDieWithRoundTrack,
-    // ToolType::SwapDraftedDieWithBag,
+    ToolType::SwapDraftedDieWithBag,
     ToolType::RerollAllDiceInPool,
     // ToolType::MoveDieIgnoringColor,
     // ToolType::MoveDieIgnoringValue,
@@ -58,7 +58,7 @@ pub enum ToolData {
     },
     SwapDraftedDieWithBag {
         draft_idx: usize,
-        face: u8,
+        face: Option<u8>,
     },
     RerollAllDiceInPool,
     MoveDieIgnoringColor {

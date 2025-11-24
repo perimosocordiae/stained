@@ -147,7 +147,24 @@ fn all_valid_tools(game: &GameState, player: &Player) -> Vec<TurnAction> {
                         }
                     }
                 }
-                _ => todo!("Implement tool: {:?}", tool.tool_type),
+                ToolType::SwapDraftedDieWithBag => {
+                    // TODO: Add SwapDraftedDieWithBag tool options
+                }
+                ToolType::MoveDieIgnoringColor => {
+                    // TODO: Add MoveDieIgnoringColor tool options
+                }
+                ToolType::MoveDieIgnoringValue => {
+                    // TODO: Add MoveDieIgnoringValue tool options
+                }
+                ToolType::MoveExactlyTwoDice => {
+                    // TODO: Add MoveExactlyTwoDice tool options
+                }
+                ToolType::MoveUpToTwoDiceMatchingColor => {
+                    // TODO: Add MoveUpToTwoDiceMatchingColor tool options
+                }
+                ToolType::DraftTwoDice => {
+                    // TODO: Add DraftTwoDice tool options
+                }
             }
             options
         })

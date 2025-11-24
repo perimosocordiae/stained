@@ -224,7 +224,69 @@ impl GameState {
                             .ok_or("Invalid draft pool index")?;
                         std::mem::swap(src, dst);
                     }
-                    _ => todo!("Implement tool: {t:?}", t = tool.tool_type),
+                    ToolData::SwapDraftedDieWithBag { draft_idx, face } => {
+                        let die = self
+                            .draft_pool
+                            .get_mut(*draft_idx)
+                            .ok_or("Invalid draft pool index")?;
+                        match face {
+                            None => {
+                                let color = self
+                                    .dice_bag
+                                    .pop()
+                                    .ok_or("Dice bag is empty")?;
+                                self.dice_bag.push(die.color);
+                                die.color = color;
+                            }
+                            Some(face) => {
+                                if !(1..=6).contains(face) {
+                                    return Err("Invalid face value".into());
+                                }
+                                if !matches!(
+                                    self.players[self.curr_player_idx]
+                                        .active_tool,
+                                    Some(ToolType::SwapDraftedDieWithBag)
+                                ) {
+                                    return Err(
+                                        "Must select a die to swap first"
+                                            .into(),
+                                    );
+                                }
+                                die.face = *face;
+                            }
+                        }
+                    }
+                    ToolData::MoveDieIgnoringColor { from } => {
+                        todo!(
+                            "Implement tool: {:?} ({from:?})",
+                            tool.tool_type
+                        );
+                    }
+                    ToolData::MoveDieIgnoringValue { from } => {
+                        todo!(
+                            "Implement tool: {:?} ({from:?})",
+                            tool.tool_type
+                        );
+                    }
+                    ToolData::MoveExactlyTwoDice { from, to } => {
+                        todo!(
+                            "Implement tool: {:?} ({from:?}, {to:?})",
+                            tool.tool_type
+                        );
+                    }
+                    ToolData::MoveUpToTwoDiceMatchingColor {
+                        from,
+                        to,
+                        round_idx,
+                    } => {
+                        todo!(
+                            "Implement tool: {:?} ({from:?}, {to:?}, {round_idx:?})",
+                            tool.tool_type
+                        );
+                    }
+                    ToolData::DraftTwoDice => {
+                        todo!("Implement tool: {:?}", tool.tool_type);
+                    }
                 }
                 self.players[self.curr_player_idx].active_tool =
                     Some(tool.tool_type);
