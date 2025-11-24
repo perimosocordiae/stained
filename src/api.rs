@@ -196,7 +196,7 @@ fn exercise_api() {
     .unwrap();
 
     let view_json = game.player_view("foo").unwrap();
-    assert!(view_json.starts_with("{"));
+    assert!(view_json.starts_with("{"), "{view_json}");
 
     let mut num_notices = 0;
     game.process_action("{\"idx\": {\"SelectTemplate\": 0}}", |id, msg| {
@@ -221,5 +221,13 @@ fn self_play() {
     assert!(game.is_game_over());
     // Smoke test the final_state method.
     let final_state = game.final_state().unwrap();
-    assert!(final_state.starts_with("{"));
+    assert!(final_state.starts_with("{"), "{final_state}");
+    // Check that we can restore from the final state.
+    let restored_game = match StainedAPI::restore(&players, &final_state) {
+        Ok(g) => g,
+        Err(e) => {
+            panic!("Failed to restore game: {e}\nfrom JSON={final_state}")
+        }
+    };
+    assert!(restored_game.is_game_over());
 }

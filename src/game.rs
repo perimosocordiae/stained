@@ -344,6 +344,7 @@ pub struct Player {
     tokens: u8,
     board: [[BoardCell; BOARD_COLS]; BOARD_ROWS],
     secret: Color,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub templates: Vec<BoardTemplate>,
     active_tool: Option<ToolType>,
 }

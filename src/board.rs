@@ -6,6 +6,7 @@ use std::fmt::Display;
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct BoardCell {
     pub slot: Slot,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub die: Option<Dice>,
 }
 impl Default for BoardCell {

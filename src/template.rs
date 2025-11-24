@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Slot {
     Any,
     Color(Color),
