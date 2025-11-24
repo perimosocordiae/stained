@@ -58,7 +58,6 @@ pub enum ToolData {
     },
     SwapDraftedDieWithBag {
         draft_idx: usize,
-        face: Option<u8>,
     },
     RerollAllDiceInPool,
     MoveDieIgnoringColor {

@@ -19,7 +19,7 @@ pub struct TurnAction {
 impl TurnAction {
     pub fn pass() -> Self {
         Self {
-            idx: ActionType::DraftDie(0),
+            idx: ActionType::DraftDie(0, None),
             coords: None,
             tool: None,
         }
@@ -29,7 +29,8 @@ impl TurnAction {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ActionType {
     SelectTemplate(usize),
-    DraftDie(usize),
+    // Option<u8> is for tools that draft with a player-specified face
+    DraftDie(usize, Option<u8>),
     UseTool(usize),
 }
 

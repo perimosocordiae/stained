@@ -1,3 +1,4 @@
+use crate::color::Dice;
 use crate::constants::{BOARD_COLS, BOARD_ROWS};
 use crate::game::{GameState, Player};
 use crate::tool::{ToolData, ToolType};
@@ -47,14 +48,30 @@ impl Agent for RandomAgent {
     }
 }
 
+fn draftable_dice(game: &GameState) -> Vec<(ActionType, Dice)> {
+    let mut draftable = Vec::new();
+    for (idx, die) in game.draft_pool.iter().enumerate() {
+        if die.face == 0 {
+            for face in 1..=6 {
+                let mut wild = *die;
+                wild.face = face;
+                draftable.push((ActionType::DraftDie(idx, Some(face)), wild));
+            }
+        } else {
+            draftable.push((ActionType::DraftDie(idx, None), *die));
+        }
+    }
+    draftable
+}
+
 fn all_valid_drafts(game: &GameState, player: &Player) -> Vec<TurnAction> {
     let mut valid_drafts = Vec::new();
-    for (idx, die) in game.draft_pool.iter().enumerate() {
+    for (idx, die) in draftable_dice(game) {
         for row in 0..BOARD_ROWS {
             for col in 0..BOARD_COLS {
-                if player.can_place_die((row, col), *die).is_ok() {
+                if player.can_place_die((row, col), die).is_ok() {
                     valid_drafts.push(TurnAction {
-                        idx: ActionType::DraftDie(idx),
+                        idx: idx.clone(),
                         coords: Some((row, col)),
                         tool: None,
                     });
@@ -148,7 +165,15 @@ fn all_valid_tools(game: &GameState, player: &Player) -> Vec<TurnAction> {
                     }
                 }
                 ToolType::SwapDraftedDieWithBag => {
-                    // TODO: Add SwapDraftedDieWithBag tool options
+                    for draft_idx in 0..game.draft_pool.len() {
+                        options.push(TurnAction {
+                            idx: ActionType::UseTool(idx),
+                            coords: None,
+                            tool: Some(ToolData::SwapDraftedDieWithBag {
+                                draft_idx,
+                            }),
+                        });
+                    }
                 }
                 ToolType::MoveDieIgnoringColor => {
                     // TODO: Add MoveDieIgnoringColor tool options

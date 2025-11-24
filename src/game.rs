@@ -144,159 +144,150 @@ impl GameState {
                 Err("Invalid action: templates have already been selected"
                     .into())
             }
-            ActionType::DraftDie(idx) => {
-                if let Some(coords) = action.coords {
-                    let die =
-                        self.draft_pool.get(idx).ok_or("Invalid die index")?;
-                    self.players[self.curr_player_idx]
-                        .place_die(coords, *die)?;
-                    self.draft_pool.remove(idx);
-                }
-                self.players[self.curr_player_idx].active_tool = None;
-                Ok(true)
+            ActionType::DraftDie(idx, face) => {
+                self.handle_draft_die(idx, face, action.coords)
             }
             ActionType::UseTool(idx) => {
-                let tool = self.tools.get(idx).ok_or("Invalid tool index")?;
                 let data =
                     action.tool.as_ref().ok_or("Tool action missing data")?;
-                self.players[self.curr_player_idx].can_use_tool(tool)?;
-                let mut rng = rand::rng();
-                match data {
-                    ToolData::RerollAllDiceInPool => {
-                        self.draft_pool
-                            .iter_mut()
-                            .for_each(|die| die.reroll(&mut rng));
-                    }
-                    ToolData::PlaceIgnoringAdjacency => {}
-                    ToolData::FlipDraftedDie { draft_idx } => {
-                        self.draft_pool
-                            .get_mut(*draft_idx)
-                            .ok_or("Invalid draft index")?
-                            .flip();
-                    }
-                    ToolData::RerollDraftedDie { draft_idx } => {
-                        self.draft_pool
-                            .get_mut(*draft_idx)
-                            .ok_or("Invalid draft index")?
-                            .reroll(&mut rng);
-                    }
-                    ToolData::BumpDraftedDie {
-                        draft_idx,
-                        is_increment,
-                    } => {
-                        let face = self
-                            .draft_pool
-                            .get(*draft_idx)
-                            .ok_or("Invalid draft index")?
-                            .face;
-                        match (*is_increment, face) {
-                            (true, 6) => {
-                                return Err(
-                                    "Cannot increment a die past 6".into()
-                                );
-                            }
-                            (false, 1) => {
-                                return Err(
-                                    "Cannot decrement a die below 1".into()
-                                );
-                            }
-                            (true, _) => {
-                                self.draft_pool[*draft_idx].increment()
-                            }
-                            (false, _) => {
-                                self.draft_pool[*draft_idx].decrement()
-                            }
-                        }
-                    }
-                    ToolData::SwapDraftedDieWithRoundTrack {
-                        draft_idx,
-                        round_idx,
-                    } => {
-                        let src = self
-                            .round_track
-                            .get_mut(round_idx.0)
-                            .ok_or("Invalid round index")?
-                            .get_mut(round_idx.1)
-                            .ok_or("Invalid die index")?;
-                        let dst = self
-                            .draft_pool
-                            .get_mut(*draft_idx)
-                            .ok_or("Invalid draft pool index")?;
-                        std::mem::swap(src, dst);
-                    }
-                    ToolData::SwapDraftedDieWithBag { draft_idx, face } => {
-                        let die = self
-                            .draft_pool
-                            .get_mut(*draft_idx)
-                            .ok_or("Invalid draft pool index")?;
-                        match face {
-                            None => {
-                                let color = self
-                                    .dice_bag
-                                    .pop()
-                                    .ok_or("Dice bag is empty")?;
-                                self.dice_bag.push(die.color);
-                                die.color = color;
-                            }
-                            Some(face) => {
-                                if !(1..=6).contains(face) {
-                                    return Err("Invalid face value".into());
-                                }
-                                if !matches!(
-                                    self.players[self.curr_player_idx]
-                                        .active_tool,
-                                    Some(ToolType::SwapDraftedDieWithBag)
-                                ) {
-                                    return Err(
-                                        "Must select a die to swap first"
-                                            .into(),
-                                    );
-                                }
-                                die.face = *face;
-                            }
-                        }
-                    }
-                    ToolData::MoveDieIgnoringColor { from } => {
-                        todo!(
-                            "Implement tool: {:?} ({from:?})",
-                            tool.tool_type
-                        );
-                    }
-                    ToolData::MoveDieIgnoringValue { from } => {
-                        todo!(
-                            "Implement tool: {:?} ({from:?})",
-                            tool.tool_type
-                        );
-                    }
-                    ToolData::MoveExactlyTwoDice { from, to } => {
-                        todo!(
-                            "Implement tool: {:?} ({from:?}, {to:?})",
-                            tool.tool_type
-                        );
-                    }
-                    ToolData::MoveUpToTwoDiceMatchingColor {
-                        from,
-                        to,
-                        round_idx,
-                    } => {
-                        todo!(
-                            "Implement tool: {:?} ({from:?}, {to:?}, {round_idx:?})",
-                            tool.tool_type
-                        );
-                    }
-                    ToolData::DraftTwoDice => {
-                        todo!("Implement tool: {:?}", tool.tool_type);
-                    }
-                }
-                self.players[self.curr_player_idx].active_tool =
-                    Some(tool.tool_type);
-                self.players[self.curr_player_idx].tokens -= tool.cost;
-                if tool.cost == 1 {
-                    self.tools[idx].cost = 2;
-                }
-                Ok(false)
+                self.handle_tool(idx, data)
             }
         }
+    }
+    fn handle_draft_die(
+        &mut self,
+        idx: usize,
+        face: Option<u8>,
+        coords: Option<(usize, usize)>,
+    ) -> Result<bool, DynError> {
+        if let Some(coords) = coords {
+            let mut die =
+                *self.draft_pool.get(idx).ok_or("Invalid die index")?;
+            match (face, die.face) {
+                (Some(f), 0) => {
+                    die.face = f;
+                }
+                (Some(_), _) => {
+                    return Err(
+                        "Cannot choose face for a non-wildcard die".into()
+                    );
+                }
+                (None, 0) => {
+                    return Err("Must choose face for a wildcard die".into());
+                }
+                (None, _) => { /* Use existing face */ }
+            }
+            self.players[self.curr_player_idx].place_die(coords, die)?;
+            self.draft_pool.remove(idx);
+        }
+        self.players[self.curr_player_idx].active_tool = None;
+        Ok(true)
+    }
+    fn handle_tool(
+        &mut self,
+        idx: usize,
+        data: &ToolData,
+    ) -> Result<bool, DynError> {
+        let tool = self.tools.get(idx).ok_or("Invalid tool index")?;
+        self.players[self.curr_player_idx].can_use_tool(tool)?;
+        let mut rng = rand::rng();
+        match data {
+            ToolData::RerollAllDiceInPool => {
+                self.draft_pool
+                    .iter_mut()
+                    .for_each(|die| die.reroll(&mut rng));
+            }
+            ToolData::PlaceIgnoringAdjacency => {}
+            ToolData::FlipDraftedDie { draft_idx } => {
+                self.draft_pool
+                    .get_mut(*draft_idx)
+                    .ok_or("Invalid draft index")?
+                    .flip();
+            }
+            ToolData::RerollDraftedDie { draft_idx } => {
+                self.draft_pool
+                    .get_mut(*draft_idx)
+                    .ok_or("Invalid draft index")?
+                    .reroll(&mut rng);
+            }
+            ToolData::BumpDraftedDie {
+                draft_idx,
+                is_increment,
+            } => {
+                let face = self
+                    .draft_pool
+                    .get(*draft_idx)
+                    .ok_or("Invalid draft index")?
+                    .face;
+                match (*is_increment, face) {
+                    (true, 6) => {
+                        return Err("Cannot increment a die past 6".into());
+                    }
+                    (false, 1) => {
+                        return Err("Cannot decrement a die below 1".into());
+                    }
+                    (true, _) => self.draft_pool[*draft_idx].increment(),
+                    (false, _) => self.draft_pool[*draft_idx].decrement(),
+                }
+            }
+            ToolData::SwapDraftedDieWithRoundTrack {
+                draft_idx,
+                round_idx,
+            } => {
+                let src = self
+                    .round_track
+                    .get_mut(round_idx.0)
+                    .ok_or("Invalid round index")?
+                    .get_mut(round_idx.1)
+                    .ok_or("Invalid die index")?;
+                let dst = self
+                    .draft_pool
+                    .get_mut(*draft_idx)
+                    .ok_or("Invalid draft pool index")?;
+                std::mem::swap(src, dst);
+            }
+            ToolData::SwapDraftedDieWithBag { draft_idx } => {
+                let die = self
+                    .draft_pool
+                    .get_mut(*draft_idx)
+                    .ok_or("Invalid draft pool index")?;
+                let color = self.dice_bag.pop().ok_or("Dice bag is empty")?;
+                self.dice_bag.push(die.color);
+                die.color = color;
+                die.face = 0; // Wildcard face; player will choose later
+            }
+            ToolData::MoveDieIgnoringColor { from } => {
+                todo!("Implement tool: {:?} ({from:?})", tool.tool_type);
+            }
+            ToolData::MoveDieIgnoringValue { from } => {
+                todo!("Implement tool: {:?} ({from:?})", tool.tool_type);
+            }
+            ToolData::MoveExactlyTwoDice { from, to } => {
+                todo!(
+                    "Implement tool: {:?} ({from:?}, {to:?})",
+                    tool.tool_type
+                );
+            }
+            ToolData::MoveUpToTwoDiceMatchingColor {
+                from,
+                to,
+                round_idx,
+            } => {
+                todo!(
+                    "Implement tool: {:?} ({from:?}, {to:?}, {round_idx:?})",
+                    tool.tool_type
+                );
+            }
+            ToolData::DraftTwoDice => {
+                todo!("Implement tool: {:?}", tool.tool_type);
+            }
+        }
+        self.players[self.curr_player_idx].active_tool = Some(tool.tool_type);
+        self.players[self.curr_player_idx].tokens -= tool.cost;
+        if tool.cost == 1 {
+            self.tools[idx].cost = 2;
+        }
+        Ok(false)
     }
     fn start_round(&mut self) {
         let mut rng = rand::rng();
@@ -378,6 +369,9 @@ impl Player {
         let cell = row.get(coords.1).ok_or("Invalid column")?;
         if cell.die.is_some() {
             return Err("Cell is already occupied".into());
+        }
+        if !(1..=6).contains(&die.face) {
+            return Err("Die face must be between 1 and 6".into());
         }
         match cell.slot {
             Slot::Color(color) if color != die.color => {
