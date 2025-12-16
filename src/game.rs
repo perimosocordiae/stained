@@ -361,6 +361,16 @@ impl Player {
         self.templates.clear();
         Ok(())
     }
+    pub fn pretty_print(&self) {
+        println!("Tokens: {}", self.tokens);
+        for row in &self.board {
+            for cell in row {
+                print!("{} ", cell);
+            }
+            println!();
+        }
+    }
+
     pub fn can_place_die(
         &self,
         coords: (usize, usize),

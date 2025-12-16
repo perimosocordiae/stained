@@ -32,8 +32,8 @@ fn run_game(args: &Args) -> Option<RunInfo> {
         .collect::<Vec<_>>();
     loop {
         if !args.quiet {
-            // TODO: pretty-print the player's board state / tokens
             println!("P{}: {:?}", g.curr_player_idx, g.phase);
+            g.current_player().pretty_print();
         }
         let act = ais[g.curr_player_idx].choose_action(&g);
         if !args.quiet {
