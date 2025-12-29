@@ -6,7 +6,7 @@ pub struct Tool {
     pub cost: u8,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ToolType {
     // Tools that modify the draft pool.
     BumpDraftedDie, // +/- 1
@@ -22,10 +22,12 @@ pub enum ToolType {
     MoveUpToTwoDiceMatchingColor, // must match a color on the round track
     // Tools that break a rule.
     DraftTwoDice, // only before first draft, skips second draft
+    #[serde(skip)]
+    DraftTwoDicePending, // internal state: one die drafted, one pending
     PlaceIgnoringAdjacency,
 }
 // TODO: Uncomment tools as they are implemented.
-pub const ALL_TOOL_TYPES: [ToolType; 7] = [
+pub const ALL_TOOL_TYPES: [ToolType; 8] = [
     ToolType::BumpDraftedDie,
     ToolType::FlipDraftedDie,
     ToolType::RerollDraftedDie,
@@ -36,7 +38,7 @@ pub const ALL_TOOL_TYPES: [ToolType; 7] = [
     // ToolType::MoveDieIgnoringValue,
     // ToolType::MoveExactlyTwoDice,
     // ToolType::MoveUpToTwoDiceMatchingColor,
-    // ToolType::DraftTwoDice,
+    ToolType::DraftTwoDice,
     ToolType::PlaceIgnoringAdjacency,
 ];
 
@@ -111,6 +113,7 @@ impl ToolData {
                     ToolType::MoveUpToTwoDiceMatchingColor
                 )
                 | (Self::DraftTwoDice, ToolType::DraftTwoDice)
+                | (Self::DraftTwoDice, ToolType::DraftTwoDicePending)
                 | (
                     Self::PlaceIgnoringAdjacency,
                     ToolType::PlaceIgnoringAdjacency

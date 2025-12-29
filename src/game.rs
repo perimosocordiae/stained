@@ -116,6 +116,12 @@ impl GameState {
                         self.curr_player_idx =
                             self.prev_idx(self.curr_player_idx);
                         self.phase = TurnPhase::SecondDraft;
+                        if self.players[self.curr_player_idx].active_tool
+                            == Some(ToolType::DraftTwoDice)
+                        {
+                            self.curr_player_idx =
+                                self.prev_idx(self.curr_player_idx);
+                        }
                     }
                 }
             }
@@ -131,6 +137,27 @@ impl GameState {
                     } else {
                         self.curr_player_idx =
                             self.prev_idx(self.curr_player_idx);
+                        // Skip players who have used the DraftTwoDice tool.
+                        // We loop because multiple players might have skipped.
+                        // We also need to check if we wrapped around to start_player_idx.
+                        while self.players[self.curr_player_idx].active_tool
+                            == Some(ToolType::DraftTwoDice)
+                            && self.curr_player_idx != self.start_player_idx
+                        {
+                            self.curr_player_idx =
+                                self.prev_idx(self.curr_player_idx);
+                        }
+                        if self.curr_player_idx == self.start_player_idx
+                            && self.players[self.curr_player_idx].active_tool
+                                == Some(ToolType::DraftTwoDice)
+                        {
+                            self.finish_round();
+                            if self.is_finished() {
+                                self.phase = TurnPhase::GameOver;
+                            } else {
+                                self.start_round();
+                            }
+                        }
                     }
                 }
             }
@@ -180,8 +207,21 @@ impl GameState {
             self.players[self.curr_player_idx].place_die(coords, die)?;
             self.draft_pool.remove(idx);
         }
-        self.players[self.curr_player_idx].active_tool = None;
-        Ok(true)
+
+        match self.players[self.curr_player_idx].active_tool {
+            Some(ToolType::DraftTwoDice) => {
+                self.players[self.curr_player_idx].active_tool = Some(ToolType::DraftTwoDicePending);
+                Ok(false)
+            }
+            Some(ToolType::DraftTwoDicePending) => {
+                self.players[self.curr_player_idx].active_tool = Some(ToolType::DraftTwoDice);
+                Ok(true)
+            }
+            _ => {
+                self.players[self.curr_player_idx].active_tool = None;
+                Ok(true)
+            }
+        }
     }
     fn handle_tool(
         &mut self,
@@ -278,9 +318,7 @@ impl GameState {
                     tool.tool_type
                 );
             }
-            ToolData::DraftTwoDice => {
-                todo!("Implement tool: {:?}", tool.tool_type);
-            }
+            ToolData::DraftTwoDice => {}
         }
         self.players[self.curr_player_idx].active_tool = Some(tool.tool_type);
         self.players[self.curr_player_idx].tokens -= tool.cost;
@@ -302,6 +340,9 @@ impl GameState {
     fn finish_round(&mut self) {
         // Any remaining dice in the draft pool are moved to the round track.
         self.round_track.push(self.draft_pool.drain(..).collect());
+        for player in self.players.iter_mut() {
+            player.active_tool = None;
+        }
         self.start_player_idx = self.next_idx(self.start_player_idx);
         self.curr_player_idx = self.start_player_idx;
     }
@@ -341,12 +382,12 @@ impl GameState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Player {
-    tokens: u8,
-    board: [[BoardCell; BOARD_COLS]; BOARD_ROWS],
-    secret: Color,
+    pub tokens: u8,
+    pub board: [[BoardCell; BOARD_COLS]; BOARD_ROWS],
+    pub secret: Color,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub templates: Vec<BoardTemplate>,
-    active_tool: Option<ToolType>,
+    pub active_tool: Option<ToolType>,
 }
 impl Player {
     fn select_template(&mut self, idx: usize) -> Result<(), DynError> {
