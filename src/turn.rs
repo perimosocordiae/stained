@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::tool::{Tool, ToolData, ToolType};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TurnPhase {
     SelectTemplate,
     FirstDraft,
