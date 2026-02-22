@@ -14,6 +14,14 @@ struct PlayerView<'a> {
     winner_id: Option<&'a str>,
 }
 
+/// Message sent when a player takes a move, for notifying other players.
+#[derive(Serialize)]
+struct ActionNotice<'a> {
+    player_idx: usize,
+    turn_action: &'a TurnAction,
+    my_view: PlayerView<'a>,
+}
+
 /// Final data to store for viewing completed games.
 #[derive(Serialize, Deserialize)]
 struct FinalState {
@@ -33,7 +41,7 @@ pub struct StainedAPI {
 }
 
 impl StainedAPI {
-    fn view(&self, player_idx: usize) -> Result<String> {
+    fn view(&self, player_idx: usize) -> Result<PlayerView<'_>> {
         let mut game = self.state.clone();
         let winner_id = if self.game_over {
             let scores = game.player_scores();
@@ -55,18 +63,27 @@ impl StainedAPI {
             game.redact_secrets(player_idx);
             None
         };
-        Ok(serde_json::to_string(&PlayerView { game, winner_id })?)
+        Ok(PlayerView { game, winner_id })
     }
     fn do_action<F: FnMut(&str, &str)>(
         &mut self,
         action: &TurnAction,
         mut notice_cb: F,
     ) -> Result<()> {
+        let player_idx = self.state.curr_player_idx;
         // Take the action.
         self.game_over = self.state.take_turn(action)?;
         // Notify all human players of the action.
         for idx in self.human_player_idxs() {
-            notice_cb(self.player_ids[idx].as_str(), self.view(idx)?.as_str());
+            let notice = ActionNotice {
+                player_idx,
+                turn_action: action,
+                my_view: self.view(idx)?,
+            };
+            notice_cb(
+                self.player_ids[idx].as_str(),
+                serde_json::to_string(&notice)?.as_str(),
+            );
         }
         Ok(())
     }
@@ -166,7 +183,7 @@ impl DynSafeGameAPI for StainedAPI {
             .iter()
             .position(|id| id == player_id)
             .ok_or("Unknown player ID")?;
-        self.view(player_idx)
+        serde_json::to_string(&self.view(player_idx)?).map_err(|e| e.into())
     }
 
     fn current_player_id(&self) -> &str {
@@ -201,7 +218,8 @@ fn exercise_api() {
     let mut num_notices = 0;
     game.process_action("{\"idx\": {\"SelectTemplate\": 0}}", |id, msg| {
         assert!(id == "foo" || id == "bar");
-        assert!(msg.starts_with("{"));
+        assert!(msg.starts_with("{"), "{msg}");
+        assert!(msg.contains("\"turn_action\""), "{msg}");
         num_notices += 1;
     })
     .unwrap();
