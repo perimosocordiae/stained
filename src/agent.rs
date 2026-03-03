@@ -87,7 +87,9 @@ fn all_valid_tools(game: &GameState, player: &Player) -> Vec<TurnAction> {
         .tools
         .iter()
         .enumerate()
-        .filter(|(_, tool)| player.can_use_tool(tool).is_ok());
+        .filter(|(_, tool)| {
+            player.can_use_tool(tool).is_ok() && !tool.in_wrong_phase(game.phase)
+        });
     usable_tools
         .flat_map(|(idx, tool)| {
             let mut options = Vec::new();
@@ -188,8 +190,13 @@ fn all_valid_tools(game: &GameState, player: &Player) -> Vec<TurnAction> {
                     // TODO: Add MoveUpToTwoDiceMatchingColor tool options
                 }
                 ToolType::DraftTwoDice => {
-                    // TODO: Add DraftTwoDice tool options
+                    options.push(TurnAction {
+                        idx: ActionType::UseTool(idx),
+                        coords: None,
+                        tool: Some(ToolData::DraftTwoDice),
+                    });
                 }
+                ToolType::DraftTwoDicePending => {}
             }
             options
         })
